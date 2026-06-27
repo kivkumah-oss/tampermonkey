@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Update Test
 // @namespace    https://github.com/kivkumah-oss
-// @version      1.1
+// @version      1.3
 // @description  Testing GitHub auto updates
 // @author       Martin
 // @match        *://*/*
@@ -13,7 +13,7 @@
 (function () {
     'use strict';
 
-    console.log("Update Test v1.1");
+    console.log("Update Test v1.3");
 
     if (!document.getElementById("martin-update-test")) {
         const div = document.createElement("div");
