@@ -4,6 +4,8 @@
 // @version      1.1
 // @description  Testing GitHub auto updates
 // @author       Martin
+// @updateURL    https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/UpdateTest.user.js
+// @downloadURL  https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/UpdateTest.user.js
 // @match        *://*/*
 // @grant        none
 // ==/UserScript==
