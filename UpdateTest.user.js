@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Bootstrap
 // @namespace    https://github.com/kivkumah-oss
-// @version      0.4.0
+// @version      0.5.0
 // @description  Nova Core bootstrap - one script to load Nova modules
 // @author       Martin
 // @match        *://*/*
@@ -13,10 +13,42 @@
 (function () {
   'use strict';
 
-  const NOVA_VERSION = '0.4.0';
-  const STORAGE_KEY = 'nova.activeModules';
+  const NOVA_VERSION = '0.5.0';
+  const ACTIVE_MODULES_KEY = 'nova.activeModules';
+  const THEME_KEY = 'nova.theme';
 
   if (document.getElementById('nova-bootstrap')) return;
+
+  const themes = {
+    violet: {
+      name: 'Violet Core',
+      primary: '#7c4dff',
+      secondary: '#00e5ff',
+      glow: 'rgba(124, 77, 255, 0.65)',
+      panelGlow: 'rgba(0, 229, 255, 0.55)'
+    },
+    ember: {
+      name: 'Ember Neon',
+      primary: '#ff3d00',
+      secondary: '#ffea00',
+      glow: 'rgba(255, 61, 0, 0.65)',
+      panelGlow: 'rgba(255, 234, 0, 0.50)'
+    },
+    toxic: {
+      name: 'Toxic Green',
+      primary: '#00c853',
+      secondary: '#64ffda',
+      glow: 'rgba(0, 200, 83, 0.65)',
+      panelGlow: 'rgba(100, 255, 218, 0.50)'
+    },
+    pink: {
+      name: 'Cyber Pink',
+      primary: '#ff2bd6',
+      secondary: '#00e5ff',
+      glow: 'rgba(255, 43, 214, 0.65)',
+      panelGlow: 'rgba(0, 229, 255, 0.55)'
+    }
+  };
 
   const modules = [
     {
@@ -58,20 +90,25 @@
 
   let modulesOpen = false;
 
-  function loadActiveModules() {
+  function loadJson(key, fallback) {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+      return JSON.parse(localStorage.getItem(key)) || fallback;
     } catch (err) {
-      console.warn('Nova: failed to load active modules', err);
-      return {};
+      console.warn(`Nova: failed to load ${key}`, err);
+      return fallback;
     }
   }
 
-  function saveActiveModules() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(activeModules));
+  function saveJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
   }
 
-  const activeModules = loadActiveModules();
+  const activeModules = loadJson(ACTIVE_MODULES_KEY, {});
+  let currentThemeId = localStorage.getItem(THEME_KEY) || 'violet';
+
+  function getTheme() {
+    return themes[currentThemeId] || themes.violet;
+  }
 
   const box = document.createElement('div');
   box.id = 'nova-bootstrap';
@@ -83,7 +120,10 @@
 
     <div id="nova-body">
       <div class="nova-status">Nova v${NOVA_VERSION}</div>
+
       <button class="nova-main-btn" id="nova-modules-btn">Modules</button>
+      <button class="nova-main-btn nova-secondary-btn" id="nova-theme-btn">Theme</button>
+
       <div id="nova-content">
         <div class="nova-hint">Click Modules to open Nova Module Manager.</div>
       </div>
@@ -95,6 +135,13 @@
 
   const style = document.createElement('style');
   style.textContent = `
+    :root {
+      --nova-primary: #7c4dff;
+      --nova-secondary: #00e5ff;
+      --nova-glow: rgba(124, 77, 255, 0.65);
+      --nova-panel-glow: rgba(0, 229, 255, 0.55);
+    }
+
     #nova-bootstrap {
       position: fixed;
       right: 24px;
@@ -102,9 +149,9 @@
       width: 340px;
       background: #10101a;
       color: #fff;
-      border: 1px solid #7c4dff;
+      border: 1px solid var(--nova-primary);
       border-radius: 16px;
-      box-shadow: 0 0 24px rgba(124, 77, 255, 0.65);
+      box-shadow: 0 0 24px var(--nova-glow);
       font-family: Arial, sans-serif;
       z-index: 999999;
       overflow: hidden;
@@ -115,7 +162,7 @@
       justify-content: space-between;
       align-items: center;
       padding: 10px 12px;
-      background: linear-gradient(135deg, #7c4dff, #00e5ff);
+      background: linear-gradient(135deg, var(--nova-primary), var(--nova-secondary));
       font-weight: bold;
     }
 
@@ -146,14 +193,20 @@
       padding: 10px;
       border: none;
       border-radius: 10px;
-      background: #7c4dff;
+      background: var(--nova-primary);
       color: white;
       font-weight: bold;
       cursor: pointer;
       margin-bottom: 10px;
     }
 
-    .nova-module {
+    .nova-secondary-btn {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .nova-module,
+    .nova-theme-card {
       padding: 10px;
       margin-top: 8px;
       border-radius: 10px;
@@ -161,12 +214,14 @@
       transition: 0.15s;
     }
 
-    .nova-module:hover {
-      background: rgba(124,77,255,0.35);
+    .nova-module:hover,
+    .nova-theme-card:hover {
+      background: color-mix(in srgb, var(--nova-primary) 35%, transparent);
       transform: translateY(-1px);
     }
 
-    .nova-module-title {
+    .nova-module-title,
+    .nova-theme-title {
       display: flex;
       justify-content: space-between;
       font-size: 13px;
@@ -174,20 +229,23 @@
       gap: 8px;
     }
 
-    .nova-module-status {
+    .nova-module-status,
+    .nova-theme-status {
       opacity: 0.75;
       font-size: 11px;
       font-weight: normal;
     }
 
-    .nova-module-desc {
+    .nova-module-desc,
+    .nova-theme-desc {
       margin-top: 6px;
       font-size: 11px;
       opacity: 0.75;
       line-height: 1.35;
     }
 
-    .nova-toggle {
+    .nova-toggle,
+    .nova-theme-apply {
       margin-top: 8px;
       width: 100%;
       padding: 7px;
@@ -196,6 +254,7 @@
       cursor: pointer;
       font-weight: bold;
       color: white;
+      background: var(--nova-primary);
     }
 
     .nova-toggle-on {
@@ -213,9 +272,9 @@
       width: 320px;
       background: #10101a;
       color: white;
-      border: 1px solid #00e5ff;
+      border: 1px solid var(--nova-secondary);
       border-radius: 14px;
-      box-shadow: 0 0 20px rgba(0,229,255,0.55);
+      box-shadow: 0 0 20px var(--nova-panel-glow);
       font-family: Arial, sans-serif;
       z-index: 999998;
       overflow: hidden;
@@ -223,7 +282,7 @@
 
     .nova-floating-header {
       padding: 9px 11px;
-      background: linear-gradient(135deg, #00e5ff, #7c4dff);
+      background: linear-gradient(135deg, var(--nova-secondary), var(--nova-primary));
       font-weight: bold;
       display: flex;
       justify-content: space-between;
@@ -258,14 +317,14 @@
       padding: 9px;
       border: none;
       border-radius: 10px;
-      background: rgba(124,77,255,0.9);
+      background: var(--nova-primary);
       color: white;
       font-weight: bold;
       cursor: pointer;
     }
 
     .nova-player-btn:hover {
-      background: rgba(0,229,255,0.85);
+      background: var(--nova-secondary);
     }
 
     .nova-player-status {
@@ -276,16 +335,60 @@
       font-size: 11px;
       opacity: 0.85;
     }
+
+    .nova-swatch {
+      display: inline-block;
+      width: 34px;
+      height: 12px;
+      border-radius: 999px;
+      margin-left: 8px;
+      vertical-align: middle;
+      border: 1px solid rgba(255,255,255,0.35);
+    }
   `;
 
   document.head.appendChild(style);
   document.body.appendChild(box);
   document.body.appendChild(panelArea);
 
+  function applyTheme(themeId) {
+    currentThemeId = themeId;
+    localStorage.setItem(THEME_KEY, themeId);
+
+    const theme = getTheme();
+    document.documentElement.style.setProperty('--nova-primary', theme.primary);
+    document.documentElement.style.setProperty('--nova-secondary', theme.secondary);
+    document.documentElement.style.setProperty('--nova-glow', theme.glow);
+    document.documentElement.style.setProperty('--nova-panel-glow', theme.panelGlow);
+  }
+
   function renderHome() {
     const content = document.getElementById('nova-content');
     content.innerHTML = `<div class="nova-hint">Click Modules to open Nova Module Manager.</div>`;
     modulesOpen = false;
+  }
+
+  function renderThemes() {
+    const content = document.getElementById('nova-content');
+    modulesOpen = false;
+
+    content.innerHTML = Object.entries(themes).map(([id, theme]) => `
+      <div class="nova-theme-card">
+        <div class="nova-theme-title">
+          <span>${theme.name}<span class="nova-swatch" style="background: linear-gradient(90deg, ${theme.primary}, ${theme.secondary});"></span></span>
+          <span class="nova-theme-status">${id === currentThemeId ? 'Active' : 'Theme'}</span>
+        </div>
+        <div class="nova-theme-desc">Primary: ${theme.primary} | Secondary: ${theme.secondary}</div>
+        <button class="nova-theme-apply" data-theme-id="${id}">${id === currentThemeId ? 'Current Theme' : 'Apply Theme'}</button>
+      </div>
+    `).join('');
+
+    document.querySelectorAll('.nova-theme-apply').forEach(button => {
+      button.onclick = () => {
+        applyTheme(button.dataset.themeId);
+        renderThemes();
+      };
+    });
   }
 
   function renderModules() {
@@ -322,7 +425,7 @@
       showModule(moduleId);
     }
 
-    saveActiveModules();
+    saveJson(ACTIVE_MODULES_KEY, activeModules);
     renderModules();
   }
 
@@ -346,7 +449,7 @@
 
     panel.querySelector('.nova-mini-close').onclick = () => {
       activeModules[moduleId] = false;
-      saveActiveModules();
+      saveJson(ACTIVE_MODULES_KEY, activeModules);
       hideModule(moduleId);
 
       if (modulesOpen) {
@@ -523,6 +626,9 @@
     renderModules();
   };
 
+  document.getElementById('nova-theme-btn').onclick = renderThemes;
+
+  applyTheme(currentThemeId);
   restoreActiveModules();
 
   console.log(`Nova Bootstrap v${NOVA_VERSION} loaded`);
