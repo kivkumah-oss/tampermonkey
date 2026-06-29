@@ -8,7 +8,6 @@
 // @grant        none
 // @updateURL    https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/UpdateTest.user.js
 // @downloadURL  https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/UpdateTest.user.js
-// ==/UserScript==
 
 (function () {
   'use strict';
