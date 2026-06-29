@@ -1,4 +1,5 @@
-Nova Bootstrap v0.3.1
+
+// ==UserScript==Nova Bootstrap v0.3.1
 
 Fixes included:
 - Skips v0.3.0.
