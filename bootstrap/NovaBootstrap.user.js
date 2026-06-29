@@ -1,4 +1,4 @@
-// ==UserScript==
+// ==/UserScript==
 // @name         Nova Bootstrap
 // @namespace    https://github.com/kivkumah-oss
 // @version      0.5.1
