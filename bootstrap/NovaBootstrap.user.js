@@ -2,13 +2,12 @@
 // @name         Nova Bootstrap
 // @namespace    https://github.com/kivkumah-oss
 // @version      0.5.0
-// @description  Nova Core bootstrap - one script to load Nova modules
+// @description  Nova Core bootstrap
 // @author       Martin
 // @match        *://*/*
 // @grant        none
-// @updateURL    https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/UpdateTest.user.js
-// @downloadURL  https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/UpdateTest.user.js
-// ==/UserScript==
+// @updateURL    https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/NovaBootstrap.user.js
+// @downloadURL  https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/NovaBootstrap.user.js
 
 (function () {
   'use strict';
