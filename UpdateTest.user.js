@@ -1,21 +1,3 @@
-
-// ==UserScript==Nova Bootstrap v0.3.1
-
-Fixes included:
-- Skips v0.3.0.
-- Modules button now toggles open/closed.
-- X still closes Nova completely.
-- Module ON/OFF buttons show/hide placeholder module panels.
-- Active module state saves in localStorage.
-- Active modules restore after page refresh.
-
-Paste everything below into:
-UpdateTest.user.js
-
-============================================================
-SOURCE CODE
-============================================================
-
 // ==UserScript==
 // @name         Nova Bootstrap
 // @namespace    https://github.com/kivkumah-oss
