@@ -1,4 +1,4 @@
-// ==/UserScript==
+// ==UserScript==
 // @name         Nova Bootstrap
 // @namespace    https://github.com/kivkumah-oss
 // @version      0.5.1
@@ -8,9 +8,10 @@
 // @grant        none
 // @updateURL    https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/NovaBootstrap.user.js
 // @downloadURL  https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/NovaBootstrap.user.js
+// ==/UserScript==
 
 (function () {
-  'use strict';
+    'use strict';
 
   const NOVA_VERSION = '0.5.1';
   const ACTIVE_MODULES_KEY = 'nova.activeModules';
