@@ -1,18 +1,19 @@
 // ==UserScript==
 // @name         Nova Bootstrap
 // @namespace    https://github.com/kivkumah-oss
-// @version      0.3.1
+// @version      0.4.0
 // @description  Nova Core bootstrap - one script to load Nova modules
 // @author       Martin
 // @match        *://*/*
 // @grant        none
 // @updateURL    https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/UpdateTest.user.js
 // @downloadURL  https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/UpdateTest.user.js
+// ==/UserScript==
 
 (function () {
   'use strict';
 
-  const NOVA_VERSION = '0.3.1';
+  const NOVA_VERSION = '0.4.0';
   const STORAGE_KEY = 'nova.activeModules';
 
   if (document.getElementById('nova-bootstrap')) return;
@@ -23,7 +24,7 @@
       icon: '🎵',
       name: 'Nova Player',
       status: 'Sandbox',
-      description: 'Test module for player UI, controls, playlists and remote ideas.'
+      description: 'Suno control module. Tests real module behaviour inside Nova.'
     },
     {
       id: 'spp',
@@ -209,7 +210,7 @@
       position: fixed;
       left: 24px;
       top: 120px;
-      width: 300px;
+      width: 320px;
       background: #10101a;
       color: white;
       border: 1px solid #00e5ff;
@@ -244,6 +245,36 @@
       cursor: pointer;
       width: 24px;
       height: 24px;
+    }
+
+    .nova-player-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .nova-player-btn {
+      padding: 9px;
+      border: none;
+      border-radius: 10px;
+      background: rgba(124,77,255,0.9);
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .nova-player-btn:hover {
+      background: rgba(0,229,255,0.85);
+    }
+
+    .nova-player-status {
+      margin-top: 10px;
+      padding: 8px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      font-size: 11px;
+      opacity: 0.85;
     }
   `;
 
@@ -304,17 +335,12 @@
     const panel = document.createElement('div');
     panel.className = 'nova-floating-module';
     panel.id = `nova-panel-${moduleId}`;
-    panel.innerHTML = `
-      <div class="nova-floating-header">
-        <span>${module.icon} ${module.name}</span>
-        <button class="nova-mini-close" data-module-id="${module.id}" title="Turn module off">×</button>
-      </div>
-      <div class="nova-floating-body">
-        <strong>Status:</strong> ${module.status}<br><br>
-        ${module.description}<br><br>
-        This is a live placeholder panel. Later this will become the real ${module.name} module.
-      </div>
-    `;
+
+    if (moduleId === 'player') {
+      panel.innerHTML = createPlayerPanel(module);
+    } else {
+      panel.innerHTML = createPlaceholderPanel(module);
+    }
 
     panelArea.appendChild(panel);
 
@@ -327,6 +353,50 @@
         renderModules();
       }
     };
+
+    if (moduleId === 'player') {
+      wirePlayerButtons();
+    }
+  }
+
+  function createPlaceholderPanel(module) {
+    return `
+      <div class="nova-floating-header">
+        <span>${module.icon} ${module.name}</span>
+        <button class="nova-mini-close" data-module-id="${module.id}" title="Turn module off">×</button>
+      </div>
+      <div class="nova-floating-body">
+        <strong>Status:</strong> ${module.status}<br><br>
+        ${module.description}<br><br>
+        This is a live placeholder panel. Later this will become the real ${module.name} module.
+      </div>
+    `;
+  }
+
+  function createPlayerPanel(module) {
+    return `
+      <div class="nova-floating-header">
+        <span>${module.icon} ${module.name}</span>
+        <button class="nova-mini-close" data-module-id="${module.id}" title="Turn module off">×</button>
+      </div>
+      <div class="nova-floating-body">
+        <strong>Status:</strong> ${module.status}<br>
+        Suno control test module.
+
+        <div class="nova-player-grid">
+          <button class="nova-player-btn" id="nova-prev">⏮ Prev</button>
+          <button class="nova-player-btn" id="nova-play">▶ / ⏸</button>
+          <button class="nova-player-btn" id="nova-next">⏭ Next</button>
+          <button class="nova-player-btn" id="nova-shuffle">🔀 Shuffle</button>
+          <button class="nova-player-btn" id="nova-scan">🔍 Scan</button>
+          <button class="nova-player-btn" id="nova-audio">🎧 Audio</button>
+        </div>
+
+        <div class="nova-player-status" id="nova-player-status">
+          Ready. Open Suno, then test buttons.
+        </div>
+      </div>
+    `;
   }
 
   function hideModule(moduleId) {
@@ -340,6 +410,104 @@
         showModule(module.id);
       }
     });
+  }
+
+  function getButtonName(button) {
+    return (
+      button.getAttribute('aria-label') ||
+      button.getAttribute('title') ||
+      button.textContent ||
+      ''
+    ).trim();
+  }
+
+  function clickSunoButton(possibleNames) {
+    const names = Array.isArray(possibleNames) ? possibleNames : [possibleNames];
+    const wanted = names.map(name => name.toLowerCase());
+    const buttons = [...document.querySelectorAll('button')];
+
+    const btn = buttons.find(button => {
+      const buttonName = getButtonName(button).toLowerCase();
+      return wanted.some(name => buttonName.includes(name));
+    });
+
+    if (!btn) {
+      setPlayerStatus(`Button not found: ${names.join(', ')}`);
+      console.warn('Nova Player: button not found. Tried:', names);
+      console.log('Nova Player: available buttons:', buttons.map(getButtonName).filter(Boolean));
+      return false;
+    }
+
+    btn.click();
+    setPlayerStatus(`Clicked: ${getButtonName(btn)}`);
+    return true;
+  }
+
+  function findAudio() {
+    return document.querySelector('audio');
+  }
+
+  function setPlayerStatus(message) {
+    const status = document.getElementById('nova-player-status');
+    if (status) status.textContent = message;
+  }
+
+  function scanSuno() {
+    const buttons = [...document.querySelectorAll('button')]
+      .map(getButtonName)
+      .filter(Boolean);
+
+    const audio = findAudio();
+
+    console.log('Nova Player scan - buttons:', buttons);
+    console.log('Nova Player scan - audio:', audio);
+
+    setPlayerStatus(`Scan complete. Buttons found: ${buttons.length}. Audio: ${audio ? 'yes' : 'no'}. Check console.`);
+  }
+
+  function wirePlayerButtons() {
+    document.getElementById('nova-prev').onclick = () => {
+      clickSunoButton(['previous song', 'previous', 'prev']);
+    };
+
+    document.getElementById('nova-next').onclick = () => {
+      clickSunoButton(['next song', 'next']);
+    };
+
+    document.getElementById('nova-shuffle').onclick = () => {
+      clickSunoButton(['toggle shuffle', 'shuffle']);
+    };
+
+    document.getElementById('nova-play').onclick = () => {
+      const audio = findAudio();
+
+      if (audio) {
+        if (audio.paused) {
+          audio.play();
+          setPlayerStatus('Audio play() requested.');
+        } else {
+          audio.pause();
+          setPlayerStatus('Audio pause() requested.');
+        }
+        return;
+      }
+
+      clickSunoButton(['play', 'pause']);
+    };
+
+    document.getElementById('nova-scan').onclick = scanSuno;
+
+    document.getElementById('nova-audio').onclick = () => {
+      const audio = findAudio();
+
+      if (!audio) {
+        setPlayerStatus('No audio element found.');
+        return;
+      }
+
+      setPlayerStatus(`Audio found. Paused: ${audio.paused}. Time: ${Math.floor(audio.currentTime)}s`);
+      console.log('Nova Player audio element:', audio);
+    };
   }
 
   document.getElementById('nova-close').onclick = () => {
