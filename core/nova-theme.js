@@ -6,11 +6,7 @@
         version: "0.1.0",
 
         init() {
-            console.log("🎨 Nova Theme Engine loaded");
-        },
-
-        apply(theme) {
-            console.log("Applying theme:", theme);
+            console.log("🎨 Nova Theme loaded");
         }
 
     };
