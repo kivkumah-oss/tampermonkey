@@ -4,13 +4,26 @@
 
   if (window.NovaTraceNetwork) return;
 
+  const TRACE_ACTIVE_KEY = 'nova.trace.active';
+  const TRACE_STARTED_AT_KEY = 'nova.trace.startedAt';
+  const TRACE_PAGE_COUNT_KEY = 'nova.trace.pageCount';
+
   const state = {
     logs: [],
     originalFetch: window.fetch,
     originalXhrOpen: XMLHttpRequest.prototype.open,
     originalXhrSend: XMLHttpRequest.prototype.send,
-    enabled: false
+    enabled: false,
+    autoResumed: false
   };
+
+  function readFlag(key) {
+    return localStorage.getItem(key) === 'true';
+  }
+
+  function writeFlag(key, value) {
+    localStorage.setItem(key, value ? 'true' : 'false');
+  }
 
   function sessionAdd(type, data) {
     if (!window.NovaSession || !window.NovaSession.isActive()) return;
@@ -48,10 +61,7 @@
           ? input.url
           : String(input);
 
-      const method =
-        init.method ||
-        (input && input.method) ||
-        'GET';
+      const method = init.method || (input && input.method) || 'GET';
 
       add('fetch-request', { method, url });
 
@@ -111,23 +121,46 @@
     };
   }
 
-  window.NovaTraceNetwork = {
-    start(options = {}) {
-      if (window.NovaSession && !window.NovaSession.isActive()) {
+  function incrementPageCount() {
+    const current = Number(localStorage.getItem(TRACE_PAGE_COUNT_KEY) || '0');
+    const next = current + 1;
+    localStorage.setItem(TRACE_PAGE_COUNT_KEY, String(next));
+    return next;
+  }
+
+  function enable(options = {}) {
+    if (window.NovaSession && !window.NovaSession.isActive()) {
+      window.NovaSession.resume();
+      if (!window.NovaSession.isActive()) {
         window.NovaSession.start({ name: options.sessionName || 'Nova Trace Session' });
       }
+    }
 
-      state.enabled = true;
-      hookFetch();
-      hookXhr();
-      sessionAdd('trace-start', { pageUrl: location.href });
+    state.enabled = true;
+    hookFetch();
+    hookXhr();
 
+    if (!options.autoResume) {
+      writeFlag(TRACE_ACTIVE_KEY, true);
+      localStorage.setItem(TRACE_STARTED_AT_KEY, new Date().toISOString());
+      localStorage.setItem(TRACE_PAGE_COUNT_KEY, '1');
+      sessionAdd('trace-start', { pageUrl: location.href, mode: 'manual' });
+    } else {
+      const pages = incrementPageCount();
+      sessionAdd('trace-resume', { pageUrl: location.href, mode: 'auto', pages });
+    }
+  }
+
+  window.NovaTraceNetwork = {
+    start(options = {}) {
+      enable(options);
       console.log('[Nova Trace Network] Started');
     },
 
     stop(options = {}) {
       sessionAdd('trace-stop', { pageUrl: location.href, count: state.logs.length });
       state.enabled = false;
+      writeFlag(TRACE_ACTIVE_KEY, false);
 
       if (options.stopSession && window.NovaSession) {
         window.NovaSession.stop();
@@ -138,8 +171,25 @@
 
     clear() {
       state.logs = [];
+      localStorage.removeItem(TRACE_STARTED_AT_KEY);
+      localStorage.removeItem(TRACE_PAGE_COUNT_KEY);
       sessionAdd('trace-clear', { pageUrl: location.href });
       console.log('[Nova Trace Network] Cleared');
+    },
+
+    isActive() {
+      return state.enabled;
+    },
+
+    getStatus() {
+      return {
+        enabled: state.enabled,
+        persisted: readFlag(TRACE_ACTIVE_KEY),
+        autoResumed: state.autoResumed,
+        startedAt: localStorage.getItem(TRACE_STARTED_AT_KEY),
+        pageCount: Number(localStorage.getItem(TRACE_PAGE_COUNT_KEY) || '0'),
+        localEvents: state.logs.length
+      };
     },
 
     getLogs() {
@@ -149,9 +199,10 @@
     copy() {
       const payload = {
         tool: 'Nova Trace Network',
-        version: '0.2.0-session',
+        version: '0.3.0-auto-resume',
         exportedAt: new Date().toISOString(),
         note: 'Metadata only. Headers, bodies, cookies, tokens and secrets are not collected.',
+        status: this.getStatus(),
         session: window.NovaSession ? window.NovaSession.current : null,
         logs: state.logs
       };
@@ -160,6 +211,16 @@
       return payload;
     }
   };
+
+  if (readFlag(TRACE_ACTIVE_KEY)) {
+    state.autoResumed = true;
+    setTimeout(() => {
+      if (!state.enabled) {
+        enable({ autoResume: true, sessionName: 'Nova Trace Session' });
+        console.log('[Nova Trace Network] Auto-resumed');
+      }
+    }, 0);
+  }
 
   console.log('[Nova Trace Network] Loaded. Use NovaTraceNetwork.start().');
 })();
