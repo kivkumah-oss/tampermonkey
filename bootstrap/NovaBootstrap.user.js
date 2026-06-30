@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Bootstrap
 // @namespace    https://github.com/kivkumah-oss
-// @version      0.5.3
+// @version      0.5.4
 // @description  Nova Core bootstrap
 // @author       Martin
 // @match        *://*/*
@@ -10,6 +10,7 @@
 // @updateURL    https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/NovaBootstrap.user.js
 // @downloadURL  https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/NovaBootstrap.user.js
 // ==/UserScript==
+
 (function () {
   'use strict';
 
