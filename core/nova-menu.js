@@ -69,8 +69,8 @@
     const panel = document.createElement('div');
     panel.id = MENU_ID;
     panel.style.cssText = [
-      'position:fixed', 'right:16px', 'bottom:64px', 'width:min(400px,calc(100vw - 32px))',
-      'max-height:min(640px,calc(100vh - 96px))', 'overflow:hidden', 'z-index:2147483646',
+      'position:fixed', 'right:16px', 'bottom:64px', 'width:min(410px,calc(100vw - 32px))',
+      'max-height:min(680px,calc(100vh - 96px))', 'overflow:hidden', 'z-index:2147483646',
       'background:rgba(10,10,18,.97)', 'color:#fff', 'border:1px solid rgba(168,85,247,.5)',
       'box-shadow:0 0 22px rgba(168,85,247,.5)', 'border-radius:14px', 'font:12px Arial,sans-serif',
       'display:none'
@@ -84,9 +84,10 @@
     const session = window.NovaSession && window.NovaSession.current ? window.NovaSession.current : null;
     const active = window.NovaSession && window.NovaSession.isActive && window.NovaSession.isActive();
     const stats = window.NovaSession && window.NovaSession.getStats ? window.NovaSession.getStats() : null;
+    const sync = window.NovaSession && window.NovaSession.getSyncStatus ? window.NovaSession.getSyncStatus() : null;
     const status = !session ? 'stopped' : session.paused ? 'paused' : active ? 'recording' : 'stopped';
     const hosts = stats && stats.byHost ? Object.keys(stats.byHost).length : 0;
-    return { session, active, stats, status, hosts };
+    return { session, active, stats, sync, status, hosts };
   }
 
   function renderSessionStatus() {
@@ -94,8 +95,12 @@
     const color = info.status === 'recording' ? '#22c55e' : info.status === 'paused' ? '#facc15' : '#f87171';
     const session = info.session;
     const stats = info.stats || { pages: 0, events: 0 };
+    const sync = info.sync || { tabId: 'unknown', channel: false, lastSyncAt: null, sessionId: null };
     const id = session && session.id ? session.id.slice(0, 8) : 'none';
     const name = session && session.name ? session.name : 'No active session';
+    const tabId = sync.tabId ? sync.tabId.slice(0, 8) : 'unknown';
+    const syncSessionId = sync.sessionId ? sync.sessionId.slice(0, 8) : 'none';
+    const lastSync = sync.lastSyncAt ? new Date(sync.lastSyncAt).toLocaleTimeString() : 'none yet';
 
     return `
       <div style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08);">
@@ -111,11 +116,17 @@
           <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${stats.events || 0}</div><div style="color:#9ca3af;">Events</div></div>
           <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${info.hosts}</div><div style="color:#9ca3af;">Hosts</div></div>
         </div>
+        <div style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:10px;padding:8px;margin-bottom:8px;line-height:1.45;color:#d1d5db;">
+          <div style="font-weight:700;color:#c084fc;margin-bottom:4px;text-transform:uppercase;font-size:10px;letter-spacing:.06em;">Cross-tab sync</div>
+          Tab: <span style="color:#fff;">${escapeHtml(tabId)}</span> · Channel: <span style="color:${sync.channel ? '#22c55e' : '#facc15'};">${sync.channel ? 'ON' : 'fallback'}</span><br>
+          Sync session: <span style="color:#fff;">${escapeHtml(syncSessionId)}</span> · Last sync: <span style="color:#fff;">${escapeHtml(lastSync)}</span>
+        </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button data-nova-session-pause style="${buttonStyle('rgba(250,204,21,.55)')}">Pause</button>
           <button data-nova-session-resume style="${buttonStyle('rgba(34,197,94,.55)')}">Resume</button>
           <button data-nova-session-stop style="${buttonStyle('rgba(248,113,113,.55)')}">Stop</button>
           <button data-nova-session-clear style="${buttonStyle('rgba(248,113,113,.35)')}">Clear</button>
+          <button data-nova-session-sync style="${buttonStyle('rgba(168,85,247,.55)')}">Sync Now</button>
         </div>
       </div>
     `;
@@ -196,7 +207,7 @@
       </div>
       ${renderSessionStatus()}
       ${renderTraceControls()}
-      <div style="padding:10px;overflow:auto;max-height:245px;">
+      <div style="padding:10px;overflow:auto;max-height:210px;">
         <div style="color:#9ca3af;margin-bottom:10px;">Build: ${escapeHtml((window.Nova && window.Nova.build) || 'unknown')}</div>
         ${body}
       </div>
@@ -210,6 +221,7 @@
     bind('[data-nova-session-resume]', () => { if (window.NovaSession) { window.NovaSession.resume(); render(); } });
     bind('[data-nova-session-stop]', () => { if (window.NovaSession) { window.NovaSession.stop(); render(); } });
     bind('[data-nova-session-clear]', () => { if (window.NovaSession) { window.NovaSession.clear(); render(); } });
+    bind('[data-nova-session-sync]', () => { if (window.NovaSession && window.NovaSession.sync) { window.NovaSession.sync(); emit('session-sync', 'Manual session sync from menu'); render(); } });
     bind('[data-nova-trace-start]', () => { if (window.NovaTraceNetwork) { window.NovaTraceNetwork.start({ sessionName: 'Nova Trace Session' }); emit('trace-start', 'Trace started from menu'); render(); } });
     bind('[data-nova-trace-stop]', () => { if (window.NovaTraceNetwork) { window.NovaTraceNetwork.stop(); emit('trace-stop', 'Trace stopped from menu'); render(); } });
     bind('[data-nova-trace-clear]', () => { if (window.NovaTraceNetwork) { window.NovaTraceNetwork.clear(); emit('trace-clear', 'Trace cleared from menu'); render(); } });
