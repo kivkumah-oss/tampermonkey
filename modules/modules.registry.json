@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
+  "version": "0.5.0",
   "updatedAt": "2026-06-30",
   "modules": [
     {
@@ -10,6 +10,15 @@
       "enabled": true,
       "core": true,
       "api": "NovaSession"
+    },
+    {
+      "id": "nova-memory",
+      "name": "Nova Memory",
+      "description": "Local per-website knowledge store for notes, selectors, endpoints, modules, and findings.",
+      "type": "core",
+      "enabled": true,
+      "core": true,
+      "api": "NovaMemory"
     },
     {
       "id": "nova-theme",
