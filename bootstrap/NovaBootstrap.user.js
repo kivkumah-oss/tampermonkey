@@ -10,48 +10,13 @@
 // @updateURL    https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/NovaBootstrap.user.js
 // @downloadURL  https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/NovaBootstrap.user.js
 // ==/UserScript==
-
 (function () {
-    'use strict';
-    
-    NovaTheme.init();
+  'use strict';
 
-  const NOVA_VERSION = '0.5.3';
-  const ACTIVE_MODULES_KEY = 'nova.activeModules';
-  const THEME_KEY = 'nova.theme';
+  NovaTheme.inject();
 
-  if (document.getElementById('nova-bootstrap')) return;
-
-  const themes = {
-    violet: {
-      name: 'Violet Core',
-      primary: '#7c4dff',
-      secondary: '#00e5ff',
-      glow: 'rgba(124, 77, 255, 0.65)',
-      panelGlow: 'rgba(0, 229, 255, 0.55)'
-    },
-    ember: {
-      name: 'Ember Neon',
-      primary: '#ff3d00',
-      secondary: '#ffea00',
-      glow: 'rgba(255, 61, 0, 0.65)',
-      panelGlow: 'rgba(255, 234, 0, 0.50)'
-    },
-    toxic: {
-      name: 'Toxic Green',
-      primary: '#00c853',
-      secondary: '#64ffda',
-      glow: 'rgba(0, 200, 83, 0.65)',
-      panelGlow: 'rgba(100, 255, 218, 0.50)'
-    },
-    pink: {
-      name: 'Cyber Pink',
-      primary: '#ff2bd6',
-      secondary: '#00e5ff',
-      glow: 'rgba(255, 43, 214, 0.65)',
-      panelGlow: 'rgba(0, 229, 255, 0.55)'
-    }
-  };
+  console.log('[Nova Bootstrap] Started');
+})();
 
   const modules = [
     {
