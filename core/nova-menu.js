@@ -11,12 +11,7 @@
   const MENU_ID = 'nova-modules-menu';
   const BUTTON_ID = 'nova-modules-button';
 
-  const state = {
-    open: false,
-    button: null,
-    panel: null,
-    refreshTimer: null
-  };
+  const state = { open: false, button: null, panel: null, refreshTimer: null };
 
   function getModules() {
     if (window.Nova && typeof window.Nova.getModules === 'function') return window.Nova.getModules();
@@ -75,7 +70,7 @@
     panel.id = MENU_ID;
     panel.style.cssText = [
       'position:fixed', 'right:16px', 'bottom:64px', 'width:min(400px,calc(100vw - 32px))',
-      'max-height:min(620px,calc(100vh - 96px))', 'overflow:hidden', 'z-index:2147483646',
+      'max-height:min(640px,calc(100vh - 96px))', 'overflow:hidden', 'z-index:2147483646',
       'background:rgba(10,10,18,.97)', 'color:#fff', 'border:1px solid rgba(168,85,247,.5)',
       'box-shadow:0 0 22px rgba(168,85,247,.5)', 'border-radius:14px', 'font:12px Arial,sans-serif',
       'display:none'
@@ -128,18 +123,32 @@
 
   function renderTraceControls() {
     const hasTrace = Boolean(window.NovaTraceNetwork);
-    const traceCount = hasTrace && typeof window.NovaTraceNetwork.getLogs === 'function' ? window.NovaTraceNetwork.getLogs().length : 0;
+    const status = hasTrace && typeof window.NovaTraceNetwork.getStatus === 'function'
+      ? window.NovaTraceNetwork.getStatus()
+      : { enabled: false, persisted: false, autoResumed: false, startedAt: null, pageCount: 0, localEvents: 0 };
+    const statusColor = status.enabled ? '#22c55e' : status.persisted ? '#facc15' : '#f87171';
+    const statusText = status.enabled ? 'active' : status.persisted ? 'armed' : 'off';
+    const startedAt = status.startedAt ? new Date(status.startedAt).toLocaleTimeString() : 'not started';
+
     return `
       <div style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08);">
-        <div style="font-weight:700;color:#22d3ee;margin-bottom:8px;text-transform:uppercase;font-size:11px;letter-spacing:.06em;">DevKit / Trace</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;">
+          <div style="font-weight:700;color:#22d3ee;text-transform:uppercase;font-size:11px;letter-spacing:.06em;">DevKit / Trace</div>
+          <div style="font-weight:700;color:${statusColor};text-transform:uppercase;font-size:11px;">● ${escapeHtml(statusText)}</div>
+        </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button data-nova-trace-start style="${buttonStyle('rgba(34,211,238,.55)')}">Start Trace</button>
           <button data-nova-trace-stop style="${buttonStyle('rgba(248,113,113,.55)')}">Stop Trace</button>
           <button data-nova-trace-clear style="${buttonStyle('rgba(250,204,21,.55)')}">Clear Trace</button>
           <button data-nova-trace-copy style="${buttonStyle('rgba(168,85,247,.55)')}">Copy Trace</button>
         </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;">
+          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${status.pageCount || 0}</div><div style="color:#9ca3af;">Trace pages</div></div>
+          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${status.localEvents || 0}</div><div style="color:#9ca3af;">Local events</div></div>
+          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${status.autoResumed ? 'YES' : 'NO'}</div><div style="color:#9ca3af;">Auto</div></div>
+        </div>
         <div style="color:#9ca3af;margin-top:8px;line-height:1.35;">
-          Trace API: ${hasTrace ? '<span style="color:#22c55e;">ready</span>' : '<span style="color:#f87171;">missing</span>'} · Local events: ${traceCount}
+          API: ${hasTrace ? '<span style="color:#22c55e;">ready</span>' : '<span style="color:#f87171;">missing</span>'} · Persistent: ${status.persisted ? 'ON' : 'OFF'} · Started: ${escapeHtml(startedAt)}
         </div>
       </div>
     `;
@@ -187,7 +196,7 @@
       </div>
       ${renderSessionStatus()}
       ${renderTraceControls()}
-      <div style="padding:10px;overflow:auto;max-height:260px;">
+      <div style="padding:10px;overflow:auto;max-height:245px;">
         <div style="color:#9ca3af;margin-bottom:10px;">Build: ${escapeHtml((window.Nova && window.Nova.build) || 'unknown')}</div>
         ${body}
       </div>
@@ -209,25 +218,12 @@
 
   function startLiveRefresh() {
     if (state.refreshTimer) return;
-    state.refreshTimer = setInterval(() => {
-      if (state.open) render();
-    }, 3000);
+    state.refreshTimer = setInterval(() => { if (state.open) render(); }, 3000);
   }
 
   window.NovaMenu = {
-    show() {
-      createButton();
-      render();
-      state.panel.style.display = 'block';
-      state.open = true;
-      startLiveRefresh();
-      emit('open', 'Nova menu opened', { modules: getModules().length });
-    },
-    hide() {
-      if (state.panel) state.panel.style.display = 'none';
-      state.open = false;
-      emit('close', 'Nova menu closed');
-    },
+    show() { createButton(); render(); state.panel.style.display = 'block'; state.open = true; startLiveRefresh(); emit('open', 'Nova menu opened', { modules: getModules().length }); },
+    hide() { if (state.panel) state.panel.style.display = 'none'; state.open = false; emit('close', 'Nova menu closed'); },
     toggle() { if (state.open) this.hide(); else this.show(); },
     refresh() { render(); },
     init() { createButton(); console.log('[Nova Core] NovaMenu initialized'); }
