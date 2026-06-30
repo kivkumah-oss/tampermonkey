@@ -10,8 +10,20 @@
 
   const MENU_ID = 'nova-modules-menu';
   const BUTTON_ID = 'nova-modules-button';
-
   const state = { open: false, button: null, panel: null, refreshTimer: null };
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function buttonStyle(accent) {
+    return `background:rgba(255,255,255,.08);color:#fff;border:1px solid ${accent || 'rgba(34,211,238,.45)'};border-radius:8px;padding:6px 8px;cursor:pointer;`;
+  }
 
   function getModules() {
     if (window.Nova && typeof window.Nova.getModules === 'function') return window.Nova.getModules();
@@ -31,19 +43,6 @@
   function emit(type, summary, data) {
     if (!window.NovaSession || !window.NovaSession.isActive()) return;
     window.NovaSession.addEvent({ module: 'menu', type, summary, data: data || {} });
-  }
-
-  function escapeHtml(value) {
-    return String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-  }
-
-  function buttonStyle(accent) {
-    return `background:rgba(255,255,255,.08);color:#fff;border:1px solid ${accent || 'rgba(34,211,238,.45)'};border-radius:8px;padding:6px 8px;cursor:pointer;`;
   }
 
   function createButton() {
@@ -69,8 +68,8 @@
     const panel = document.createElement('div');
     panel.id = MENU_ID;
     panel.style.cssText = [
-      'position:fixed', 'right:16px', 'bottom:64px', 'width:min(410px,calc(100vw - 32px))',
-      'max-height:min(680px,calc(100vh - 96px))', 'overflow:hidden', 'z-index:2147483646',
+      'position:fixed', 'right:16px', 'bottom:64px', 'width:min(420px,calc(100vw - 32px))',
+      'max-height:min(720px,calc(100vh - 96px))', 'overflow:hidden', 'z-index:2147483646',
       'background:rgba(10,10,18,.97)', 'color:#fff', 'border:1px solid rgba(168,85,247,.5)',
       'box-shadow:0 0 22px rgba(168,85,247,.5)', 'border-radius:14px', 'font:12px Arial,sans-serif',
       'display:none'
@@ -80,21 +79,19 @@
     return panel;
   }
 
-  function getSessionState() {
+  function getSessionInfo() {
     const session = window.NovaSession && window.NovaSession.current ? window.NovaSession.current : null;
     const active = window.NovaSession && window.NovaSession.isActive && window.NovaSession.isActive();
-    const stats = window.NovaSession && window.NovaSession.getStats ? window.NovaSession.getStats() : null;
+    const stats = window.NovaSession && window.NovaSession.getStats ? window.NovaSession.getStats() : { pages: 0, events: 0, byHost: {} };
     const sync = window.NovaSession && window.NovaSession.getSyncStatus ? window.NovaSession.getSyncStatus() : null;
     const status = !session ? 'stopped' : session.paused ? 'paused' : active ? 'recording' : 'stopped';
-    const hosts = stats && stats.byHost ? Object.keys(stats.byHost).length : 0;
-    return { session, active, stats, sync, status, hosts };
+    return { session, active, stats, sync, status, hosts: stats && stats.byHost ? Object.keys(stats.byHost).length : 0 };
   }
 
   function renderSessionStatus() {
-    const info = getSessionState();
+    const info = getSessionInfo();
     const color = info.status === 'recording' ? '#22c55e' : info.status === 'paused' ? '#facc15' : '#f87171';
     const session = info.session;
-    const stats = info.stats || { pages: 0, events: 0 };
     const sync = info.sync || { tabId: 'unknown', channel: false, lastSyncAt: null, sessionId: null };
     const id = session && session.id ? session.id.slice(0, 8) : 'none';
     const name = session && session.name ? session.name : 'No active session';
@@ -108,12 +105,10 @@
           <div style="font-weight:700;color:#a855f7;text-transform:uppercase;font-size:11px;letter-spacing:.06em;">Session</div>
           <div style="font-weight:700;color:${color};text-transform:uppercase;font-size:11px;">● ${escapeHtml(info.status)}</div>
         </div>
-        <div style="color:#d1d5db;margin-bottom:8px;line-height:1.35;">
-          ${escapeHtml(name)} <span style="color:#6b7280;">#${escapeHtml(id)}</span>
-        </div>
+        <div style="color:#d1d5db;margin-bottom:8px;line-height:1.35;">${escapeHtml(name)} <span style="color:#6b7280;">#${escapeHtml(id)}</span></div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;">
-          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${stats.pages || 0}</div><div style="color:#9ca3af;">Pages</div></div>
-          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${stats.events || 0}</div><div style="color:#9ca3af;">Events</div></div>
+          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${info.stats.pages || 0}</div><div style="color:#9ca3af;">Pages</div></div>
+          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${info.stats.events || 0}</div><div style="color:#9ca3af;">Events</div></div>
           <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${info.hosts}</div><div style="color:#9ca3af;">Hosts</div></div>
         </div>
         <div style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:10px;padding:8px;margin-bottom:8px;line-height:1.45;color:#d1d5db;">
@@ -153,13 +148,36 @@
           <button data-nova-trace-clear style="${buttonStyle('rgba(250,204,21,.55)')}">Clear Trace</button>
           <button data-nova-trace-copy style="${buttonStyle('rgba(168,85,247,.55)')}">Copy Trace</button>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;">
-          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${status.pageCount || 0}</div><div style="color:#9ca3af;">Trace pages</div></div>
-          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${status.localEvents || 0}</div><div style="color:#9ca3af;">Local events</div></div>
-          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:700;">${status.autoResumed ? 'YES' : 'NO'}</div><div style="color:#9ca3af;">Auto</div></div>
-        </div>
         <div style="color:#9ca3af;margin-top:8px;line-height:1.35;">
-          API: ${hasTrace ? '<span style="color:#22c55e;">ready</span>' : '<span style="color:#f87171;">missing</span>'} · Persistent: ${status.persisted ? 'ON' : 'OFF'} · Started: ${escapeHtml(startedAt)}
+          API: ${hasTrace ? '<span style="color:#22c55e;">ready</span>' : '<span style="color:#f87171;">missing</span>'} · Persistent: ${status.persisted ? 'ON' : 'OFF'} · Pages: ${status.pageCount || 0} · Events: ${status.localEvents || 0} · Started: ${escapeHtml(startedAt)}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderDomControls() {
+    const hasDom = Boolean(window.NovaDOMInspector);
+    const summary = hasDom && typeof window.NovaDOMInspector.summary === 'function'
+      ? window.NovaDOMInspector.summary()
+      : null;
+    const counts = summary ? summary.counts : { totalElements: 0, buttons: 0, inputs: 0, links: 0, tables: 0 };
+
+    return `
+      <div style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;">
+          <div style="font-weight:700;color:#38bdf8;text-transform:uppercase;font-size:11px;letter-spacing:.06em;">DevKit / DOM Inspector</div>
+          <div style="font-weight:700;color:${hasDom ? '#22c55e' : '#f87171'};text-transform:uppercase;font-size:11px;">● ${hasDom ? 'ready' : 'missing'}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button data-nova-dom-summary style="${buttonStyle('rgba(56,189,248,.55)')}">Copy DOM Summary</button>
+          <button data-nova-dom-full style="${buttonStyle('rgba(168,85,247,.55)')}">Copy Full DOM</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px;">
+          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:15px;font-weight:700;">${counts.totalElements || 0}</div><div style="color:#9ca3af;">All</div></div>
+          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:15px;font-weight:700;">${counts.buttons || 0}</div><div style="color:#9ca3af;">Btns</div></div>
+          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:15px;font-weight:700;">${counts.inputs || 0}</div><div style="color:#9ca3af;">Inputs</div></div>
+          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:15px;font-weight:700;">${counts.links || 0}</div><div style="color:#9ca3af;">Links</div></div>
+          <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:15px;font-weight:700;">${counts.tables || 0}</div><div style="color:#9ca3af;">Tables</div></div>
         </div>
       </div>
     `;
@@ -169,16 +187,7 @@
     const enabled = module.enabled !== false;
     const api = module.api ? `<div style="color:#9ca3af;margin-top:3px;">API: ${escapeHtml(module.api)}</div>` : '';
     const description = module.description ? `<div style="color:#d1d5db;margin-top:4px;line-height:1.35;">${escapeHtml(module.description)}</div>` : '';
-    return `
-      <div style="padding:9px 10px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.04);margin-bottom:8px;">
-        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-          <div style="font-weight:700;">${escapeHtml(module.name || module.id || 'Unnamed module')}</div>
-          <div style="font-size:10px;color:${enabled ? '#22c55e' : '#f87171'};text-transform:uppercase;">${enabled ? 'enabled' : 'disabled'}</div>
-        </div>
-        <div style="color:#9ca3af;margin-top:3px;">ID: ${escapeHtml(module.id || 'unknown')}</div>
-        ${api}${description}
-      </div>
-    `;
+    return `<div style="padding:9px 10px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.04);margin-bottom:8px;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><div style="font-weight:700;">${escapeHtml(module.name || module.id || 'Unnamed module')}</div><div style="font-size:10px;color:${enabled ? '#22c55e' : '#f87171'};text-transform:uppercase;">${enabled ? 'enabled' : 'disabled'}</div></div><div style="color:#9ca3af;margin-top:3px;">ID: ${escapeHtml(module.id || 'unknown')}</div>${api}${description}</div>`;
   }
 
   function bind(selector, handler) {
@@ -207,7 +216,8 @@
       </div>
       ${renderSessionStatus()}
       ${renderTraceControls()}
-      <div style="padding:10px;overflow:auto;max-height:210px;">
+      ${renderDomControls()}
+      <div style="padding:10px;overflow:auto;max-height:160px;">
         <div style="color:#9ca3af;margin-bottom:10px;">Build: ${escapeHtml((window.Nova && window.Nova.build) || 'unknown')}</div>
         ${body}
       </div>
@@ -226,6 +236,8 @@
     bind('[data-nova-trace-stop]', () => { if (window.NovaTraceNetwork) { window.NovaTraceNetwork.stop(); emit('trace-stop', 'Trace stopped from menu'); render(); } });
     bind('[data-nova-trace-clear]', () => { if (window.NovaTraceNetwork) { window.NovaTraceNetwork.clear(); emit('trace-clear', 'Trace cleared from menu'); render(); } });
     bind('[data-nova-trace-copy]', () => { if (window.NovaTraceNetwork) { window.NovaTraceNetwork.copy(); emit('trace-copy', 'Trace copied from menu'); } });
+    bind('[data-nova-dom-summary]', () => { if (window.NovaDOMInspector) { const snapshot = window.NovaDOMInspector.summary(); navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2)); emit('dom-summary-copy', 'DOM summary copied from menu', snapshot.counts); render(); } });
+    bind('[data-nova-dom-full]', () => { if (window.NovaDOMInspector) { window.NovaDOMInspector.copy(); emit('dom-full-copy', 'Full DOM snapshot copied from menu'); render(); } });
   }
 
   function startLiveRefresh() {
