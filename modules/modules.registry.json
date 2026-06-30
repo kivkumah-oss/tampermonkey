@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "updatedAt": "2026-06-30",
   "modules": [
     {
@@ -46,6 +46,15 @@
       "enabled": true,
       "core": true,
       "api": "NovaDOMInspector"
+    },
+    {
+      "id": "nova-investigation-export",
+      "name": "Nova Investigation Export",
+      "description": "AI-ready export package combining session, trace, DOM, and Nova metadata.",
+      "type": "devkit",
+      "enabled": true,
+      "core": true,
+      "api": "NovaInvestigationExport"
     }
   ]
 }
