@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      0.8.0
+// @version      0.9.0
 // @description  Nova Core bootstrap loader
 // @author       Nova
 // @match        *://*/*
@@ -13,6 +13,7 @@
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js
 // ==/UserScript==
 
 (function () {
@@ -21,8 +22,8 @@
   const REGISTRY_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/modules.registry.json';
 
   window.Nova = window.Nova || {};
-  window.Nova.version = '0.8.0';
-  window.Nova.build = 'mission-019-memory';
+  window.Nova.version = '0.9.0';
+  window.Nova.build = 'mission-020-memory-panel';
   window.Nova.loadedAt = new Date().toISOString();
   window.Nova.registryUrl = REGISTRY_URL;
   window.Nova.registry = null;
@@ -35,7 +36,8 @@
     traceNetwork: window.NovaTraceNetwork || null,
     domInspector: window.NovaDOMInspector || null,
     investigationExport: window.NovaInvestigationExport || null,
-    menu: window.NovaMenu || null
+    menu: window.NovaMenu || null,
+    memoryPanel: window.NovaMemoryPanel || null
   };
 
   async function loadRegistry() {
@@ -51,6 +53,9 @@
 
       if (window.NovaMenu && typeof window.NovaMenu.refresh === 'function') {
         window.NovaMenu.refresh();
+      }
+      if (window.NovaMemoryPanel && typeof window.NovaMemoryPanel.refresh === 'function') {
+        window.NovaMemoryPanel.refresh();
       }
 
       if (window.NovaSession && window.NovaSession.isActive()) {
@@ -92,6 +97,7 @@
     console.log('DOM Inspector:', Boolean(window.NovaDOMInspector));
     console.log('Investigation Export:', Boolean(window.NovaInvestigationExport));
     console.log('Menu:', Boolean(window.NovaMenu));
+    console.log('Memory Panel:', Boolean(window.NovaMemoryPanel));
     console.log('Registry URL:', REGISTRY_URL);
     console.groupEnd();
   }
