@@ -16,7 +16,23 @@
 
   NovaTheme.inject();
 
-  console.log('[Nova Bootstrap] Started');
+  const panel = document.createElement('div');
+  panel.className = 'nova-window';
+  panel.style.position = 'fixed';
+  panel.style.top = '100px';
+  panel.style.right = '100px';
+  panel.style.width = '280px';
+
+  panel.innerHTML = `
+    <div class="nova-header">Nova Core</div>
+    <div class="nova-body">
+      <button class="nova-btn">Test Button</button>
+    </div>
+  `;
+
+  document.body.appendChild(panel);
+
+  console.log('[Nova Bootstrap] Panel created');
 })();
 
   const modules = [
