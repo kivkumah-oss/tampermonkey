@@ -6,12 +6,15 @@
 // @author       Martin
 // @match        *://*/*
 // @grant        none
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js
 // @updateURL    https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/NovaBootstrap.user.js
 // @downloadURL  https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/NovaBootstrap.user.js
 // ==/UserScript==
 
 (function () {
     'use strict';
+    
+    NovaTheme.init();
 
   const NOVA_VERSION = '0.5.2';
   const ACTIVE_MODULES_KEY = 'nova.activeModules';
