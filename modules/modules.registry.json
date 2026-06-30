@@ -1,5 +1,5 @@
 {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "updatedAt": "2026-06-30",
   "modules": [
     {
@@ -19,6 +19,15 @@
       "enabled": true,
       "core": true,
       "api": "NovaMemory"
+    },
+    {
+      "id": "nova-memory-panel",
+      "name": "Nova Memory Panel",
+      "description": "Floating controls for viewing, saving, searching, copying, and clearing local website memory.",
+      "type": "core",
+      "enabled": true,
+      "core": true,
+      "api": "NovaMemoryPanel"
     },
     {
       "id": "nova-theme",
