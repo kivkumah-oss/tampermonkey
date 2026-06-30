@@ -1,5 +1,5 @@
 {
-  "version": "0.6.0",
+  "version": "0.7.0",
   "updatedAt": "2026-06-30",
   "modules": [
     {
@@ -19,6 +19,15 @@
       "enabled": true,
       "core": true,
       "api": "NovaMemory"
+    },
+    {
+      "id": "nova-memory-autolearn",
+      "name": "Nova Memory AutoLearn",
+      "description": "Automatic safe learning from DOM and Trace summaries into local website memory.",
+      "type": "core",
+      "enabled": true,
+      "core": true,
+      "api": "NovaMemoryAutoLearn"
     },
     {
       "id": "nova-memory-panel",
