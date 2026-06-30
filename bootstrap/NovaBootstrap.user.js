@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Bootstrap
 // @namespace    https://github.com/kivkumah-oss
-// @version      0.5.4
+// @version      0.5.5
 // @description  Nova Core bootstrap
 // @author       Martin
 // @match        *://*/*
