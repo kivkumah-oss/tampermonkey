@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Bootstrap
 // @namespace    https://github.com/kivkumah-oss
-// @version      0.5.2
+// @version      0.5.3
 // @description  Nova Core bootstrap
 // @author       Martin
 // @match        *://*/*
@@ -16,7 +16,7 @@
     
     NovaTheme.init();
 
-  const NOVA_VERSION = '0.5.2';
+  const NOVA_VERSION = '0.5.3';
   const ACTIVE_MODULES_KEY = 'nova.activeModules';
   const THEME_KEY = 'nova.theme';
 
