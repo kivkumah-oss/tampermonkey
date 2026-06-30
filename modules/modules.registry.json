@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "updatedAt": "2026-06-30",
   "modules": [
     {
@@ -37,6 +37,15 @@
       "enabled": true,
       "core": true,
       "api": "NovaTraceNetwork"
+    },
+    {
+      "id": "nova-dom-inspector",
+      "name": "Nova DOM Inspector",
+      "description": "Universal page structure inspector for safe DOM metadata snapshots.",
+      "type": "devkit",
+      "enabled": true,
+      "core": true,
+      "api": "NovaDOMInspector"
     }
   ]
 }
