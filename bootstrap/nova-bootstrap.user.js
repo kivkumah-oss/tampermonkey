@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      1.0.0
+// @version      1.1.0
 // @description  Nova Core bootstrap loader
 // @author       Nova
 // @match        *://*/*
@@ -15,6 +15,7 @@
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js
 // ==/UserScript==
 
 (function () {
@@ -23,8 +24,8 @@
   const REGISTRY_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/modules.registry.json';
 
   window.Nova = window.Nova || {};
-  window.Nova.version = '1.0.0';
-  window.Nova.build = 'mission-021-memory-autolearn';
+  window.Nova.version = '1.1.0';
+  window.Nova.build = 'mission-022-brain';
   window.Nova.loadedAt = new Date().toISOString();
   window.Nova.registryUrl = REGISTRY_URL;
   window.Nova.registry = null;
@@ -35,6 +36,7 @@
     session: window.NovaSession || null,
     memory: window.NovaMemory || null,
     memoryAutoLearn: window.NovaMemoryAutoLearn || null,
+    brain: window.NovaBrain || null,
     traceNetwork: window.NovaTraceNetwork || null,
     domInspector: window.NovaDOMInspector || null,
     investigationExport: window.NovaInvestigationExport || null,
@@ -92,6 +94,7 @@
     console.log('Session:', Boolean(window.NovaSession));
     console.log('Memory:', Boolean(window.NovaMemory));
     console.log('Memory AutoLearn:', Boolean(window.NovaMemoryAutoLearn));
+    console.log('Brain:', Boolean(window.NovaBrain));
     console.log('Trace Network:', Boolean(window.NovaTraceNetwork));
     console.log('DOM Inspector:', Boolean(window.NovaDOMInspector));
     console.log('Investigation Export:', Boolean(window.NovaInvestigationExport));
