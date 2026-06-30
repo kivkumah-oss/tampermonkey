@@ -84,7 +84,7 @@
       'right:16px',
       'bottom:64px',
       'width:min(380px,calc(100vw - 32px))',
-      'max-height:min(520px,calc(100vh - 96px))',
+      'max-height:min(560px,calc(100vh - 96px))',
       'overflow:hidden',
       'z-index:2147483646',
       'background:rgba(10,10,18,.97)',
@@ -129,6 +129,32 @@
       .replaceAll("'", '&#039;');
   }
 
+  function buttonStyle(accent) {
+    return `background:rgba(255,255,255,.08);color:#fff;border:1px solid ${accent || 'rgba(34,211,238,.45)'};border-radius:8px;padding:6px 8px;cursor:pointer;`;
+  }
+
+  function renderTraceControls() {
+    const hasTrace = Boolean(window.NovaTraceNetwork);
+    const traceCount = hasTrace && typeof window.NovaTraceNetwork.getLogs === 'function'
+      ? window.NovaTraceNetwork.getLogs().length
+      : 0;
+
+    return `
+      <div style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08);">
+        <div style="font-weight:700;color:#22d3ee;margin-bottom:8px;text-transform:uppercase;font-size:11px;letter-spacing:.06em;">DevKit / Trace</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button data-nova-trace-start style="${buttonStyle('rgba(34,211,238,.55)')}">Start Trace</button>
+          <button data-nova-trace-stop style="${buttonStyle('rgba(248,113,113,.55)')}">Stop Trace</button>
+          <button data-nova-trace-clear style="${buttonStyle('rgba(250,204,21,.55)')}">Clear Trace</button>
+          <button data-nova-trace-copy style="${buttonStyle('rgba(168,85,247,.55)')}">Copy Trace</button>
+        </div>
+        <div style="color:#9ca3af;margin-top:8px;line-height:1.35;">
+          Trace API: ${hasTrace ? '<span style="color:#22c55e;">ready</span>' : '<span style="color:#f87171;">missing</span>'} · Local events: ${traceCount}
+        </div>
+      </div>
+    `;
+  }
+
   function render() {
     const panel = createPanel();
     const modules = getModules();
@@ -150,11 +176,12 @@
         <button data-nova-menu-close style="background:rgba(0,0,0,.25);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 7px;cursor:pointer;">×</button>
       </div>
       <div style="padding:10px;display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.08);">
-        <button data-nova-menu-refresh style="background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(34,211,238,.45);border-radius:8px;padding:6px 8px;cursor:pointer;">Refresh Registry</button>
-        <button data-nova-session-start style="background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(34,211,238,.45);border-radius:8px;padding:6px 8px;cursor:pointer;">Start Session</button>
-        <button data-nova-session-copy style="background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(34,211,238,.45);border-radius:8px;padding:6px 8px;cursor:pointer;">Copy Session</button>
+        <button data-nova-menu-refresh style="${buttonStyle()}">Refresh Registry</button>
+        <button data-nova-session-start style="${buttonStyle()}">Start Session</button>
+        <button data-nova-session-copy style="${buttonStyle()}">Copy Session</button>
       </div>
-      <div style="padding:10px;overflow:auto;max-height:390px;">
+      ${renderTraceControls()}
+      <div style="padding:10px;overflow:auto;max-height:330px;">
         <div style="color:#9ca3af;margin-bottom:10px;">Build: ${escapeHtml((window.Nova && window.Nova.build) || 'unknown')}</div>
         ${body}
       </div>
@@ -178,6 +205,33 @@
       if (window.NovaSession) {
         window.NovaSession.copy();
         emit('session-copy', 'Session copied from menu');
+      }
+    });
+    panel.querySelector('[data-nova-trace-start]').addEventListener('click', () => {
+      if (window.NovaTraceNetwork) {
+        window.NovaTraceNetwork.start({ sessionName: 'Nova Trace Session' });
+        emit('trace-start', 'Trace started from menu');
+        render();
+      }
+    });
+    panel.querySelector('[data-nova-trace-stop]').addEventListener('click', () => {
+      if (window.NovaTraceNetwork) {
+        window.NovaTraceNetwork.stop();
+        emit('trace-stop', 'Trace stopped from menu');
+        render();
+      }
+    });
+    panel.querySelector('[data-nova-trace-clear]').addEventListener('click', () => {
+      if (window.NovaTraceNetwork) {
+        window.NovaTraceNetwork.clear();
+        emit('trace-clear', 'Trace cleared from menu');
+        render();
+      }
+    });
+    panel.querySelector('[data-nova-trace-copy]').addEventListener('click', () => {
+      if (window.NovaTraceNetwork) {
+        window.NovaTraceNetwork.copy();
+        emit('trace-copy', 'Trace copied from menu');
       }
     });
   }
