@@ -1,5 +1,5 @@
 {
-  "version": "0.7.0",
+  "version": "0.8.0",
   "updatedAt": "2026-06-30",
   "modules": [
     {
@@ -28,6 +28,15 @@
       "enabled": true,
       "core": true,
       "api": "NovaMemoryAutoLearn"
+    },
+    {
+      "id": "nova-brain",
+      "name": "Nova Brain",
+      "description": "Local pattern engine that turns DOM, Trace, and Memory summaries into grounded insights and module recommendations.",
+      "type": "core",
+      "enabled": true,
+      "core": true,
+      "api": "NovaBrain"
     },
     {
       "id": "nova-memory-panel",
