@@ -1,5 +1,42 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "updatedAt": "2026-06-30",
-  "modules": []
+  "modules": [
+    {
+      "id": "nova-session",
+      "name": "Nova Session",
+      "description": "Persistent investigation session engine used by Nova core and modules.",
+      "type": "core",
+      "enabled": true,
+      "core": true,
+      "api": "NovaSession"
+    },
+    {
+      "id": "nova-theme",
+      "name": "Nova Theme",
+      "description": "Shared theme engine for Nova windows, panels, and modules.",
+      "type": "core",
+      "enabled": true,
+      "core": true,
+      "api": "NovaTheme"
+    },
+    {
+      "id": "nova-menu",
+      "name": "Nova Modules Menu",
+      "description": "Floating menu for viewing Nova modules and starting or exporting sessions.",
+      "type": "core",
+      "enabled": true,
+      "core": true,
+      "api": "NovaMenu"
+    },
+    {
+      "id": "nova-trace",
+      "name": "Nova Trace",
+      "description": "Developer investigation tool for recording safe page activity metadata.",
+      "type": "devkit",
+      "enabled": true,
+      "core": true,
+      "api": "NovaTraceNetwork"
+    }
+  ]
 }
