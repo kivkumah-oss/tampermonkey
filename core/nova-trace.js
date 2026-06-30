@@ -1,4 +1,4 @@
-// core/nova-trace-network.js
+// core/nova-trace.js
 (function () {
   'use strict';
 
@@ -12,16 +12,28 @@
     enabled: false
   };
 
+  function sessionAdd(type, data) {
+    if (!window.NovaSession || !window.NovaSession.isActive()) return;
+    window.NovaSession.addEvent({
+      module: 'trace-network',
+      type,
+      summary: data && data.method && data.url ? data.method + ' ' + data.url : type,
+      data: data || {}
+    });
+  }
+
   function add(type, data) {
     if (!state.enabled) return;
 
-    state.logs.push({
+    const entry = {
       time: new Date().toISOString(),
       type,
       pageUrl: location.href,
       ...data
-    });
+    };
 
+    state.logs.push(entry);
+    sessionAdd(type, entry);
     console.log('[Nova Trace Network]', type, data);
   }
 
@@ -41,10 +53,7 @@
         (input && input.method) ||
         'GET';
 
-      add('fetch-request', {
-        method,
-        url
-      });
+      add('fetch-request', { method, url });
 
       try {
         const response = await state.originalFetch.apply(this, arguments);
@@ -77,29 +86,17 @@
     if (XMLHttpRequest.prototype.open.__novaTraceNetworkHooked) return;
 
     XMLHttpRequest.prototype.open = function novaTraceXhrOpen(method, url) {
-      this.__novaTraceNetwork = {
-        method,
-        url,
-        started: 0
-      };
-
+      this.__novaTraceNetwork = { method, url, started: 0 };
       return state.originalXhrOpen.apply(this, arguments);
     };
 
     XMLHttpRequest.prototype.open.__novaTraceNetworkHooked = true;
 
     XMLHttpRequest.prototype.send = function novaTraceXhrSend() {
-      const trace = this.__novaTraceNetwork || {
-        method: 'GET',
-        url: 'unknown'
-      };
-
+      const trace = this.__novaTraceNetwork || { method: 'GET', url: 'unknown' };
       trace.started = performance.now();
 
-      add('xhr-request', {
-        method: trace.method,
-        url: trace.url
-      });
+      add('xhr-request', { method: trace.method, url: trace.url });
 
       this.addEventListener('loadend', () => {
         add('xhr-response', {
@@ -115,21 +112,33 @@
   }
 
   window.NovaTraceNetwork = {
-    start() {
+    start(options = {}) {
+      if (window.NovaSession && !window.NovaSession.isActive()) {
+        window.NovaSession.start({ name: options.sessionName || 'Nova Trace Session' });
+      }
+
       state.enabled = true;
       hookFetch();
       hookXhr();
+      sessionAdd('trace-start', { pageUrl: location.href });
 
       console.log('[Nova Trace Network] Started');
     },
 
-    stop() {
+    stop(options = {}) {
+      sessionAdd('trace-stop', { pageUrl: location.href, count: state.logs.length });
       state.enabled = false;
+
+      if (options.stopSession && window.NovaSession) {
+        window.NovaSession.stop();
+      }
+
       console.log('[Nova Trace Network] Stopped');
     },
 
     clear() {
       state.logs = [];
+      sessionAdd('trace-clear', { pageUrl: location.href });
       console.log('[Nova Trace Network] Cleared');
     },
 
@@ -140,9 +149,10 @@
     copy() {
       const payload = {
         tool: 'Nova Trace Network',
-        version: '0.1.0-safe',
+        version: '0.2.0-session',
         exportedAt: new Date().toISOString(),
         note: 'Metadata only. Headers, bodies, cookies, tokens and secrets are not collected.',
+        session: window.NovaSession ? window.NovaSession.current : null,
         logs: state.logs
       };
 
