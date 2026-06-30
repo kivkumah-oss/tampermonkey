@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      0.5.0
+// @version      0.6.0
 // @description  Nova Core bootstrap loader
 // @author       Nova
 // @match        *://*/*
@@ -9,6 +9,7 @@
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js
 // ==/UserScript==
 
@@ -18,8 +19,8 @@
   const REGISTRY_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/modules.registry.json';
 
   window.Nova = window.Nova || {};
-  window.Nova.version = '0.5.0';
-  window.Nova.build = 'mission-005-modules-menu';
+  window.Nova.version = '0.6.0';
+  window.Nova.build = 'mission-015-dom-inspector';
   window.Nova.loadedAt = new Date().toISOString();
   window.Nova.registryUrl = REGISTRY_URL;
   window.Nova.registry = null;
@@ -29,6 +30,7 @@
     theme: window.NovaTheme || null,
     session: window.NovaSession || null,
     traceNetwork: window.NovaTraceNetwork || null,
+    domInspector: window.NovaDOMInspector || null,
     menu: window.NovaMenu || null
   };
 
@@ -82,6 +84,7 @@
     console.log('Theme:', Boolean(window.NovaTheme));
     console.log('Session:', Boolean(window.NovaSession));
     console.log('Trace Network:', Boolean(window.NovaTraceNetwork));
+    console.log('DOM Inspector:', Boolean(window.NovaDOMInspector));
     console.log('Menu:', Boolean(window.NovaMenu));
     console.log('Registry URL:', REGISTRY_URL);
     console.groupEnd();
