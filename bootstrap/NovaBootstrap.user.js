@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Nova Bootstrap
 // @namespace    https://github.com/kivkumah-oss
-// @version      0.5.5
+// @version      0.5.6
 // @description  Nova Core bootstrap
 // @author       Martin
 // @match        *://*/*
 // @grant        none
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js?v=056
 // @updateURL    https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/NovaBootstrap.user.js
 // @downloadURL  https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/NovaBootstrap.user.js
 // ==/UserScript==
@@ -14,72 +14,45 @@
 (function () {
   'use strict';
 
-  NovaTheme.inject();
+  const NOVA_VERSION = '0.5.6';
+  const ACTIVE_MODULES_KEY = 'nova-active-modules';
+  const THEME_KEY = 'nova-theme';
 
-  const panel = document.createElement('div');
-  panel.className = 'nova-window';
-  panel.style.position = 'fixed';
-  panel.style.top = '100px';
-  panel.style.right = '100px';
-  panel.style.width = '280px';
-
-  panel.innerHTML = `
-    <div class="nova-header">Nova Core</div>
-    <div class="nova-body">
-      <button class="nova-btn">Test Button</button>
-    </div>
-  `;
-
-  document.body.appendChild(panel);
-
-  console.log('[Nova Bootstrap] Panel created');
-})();
-
-  const modules = [
-    {
-      id: 'player',
-      icon: '🎵',
-      name: 'Nova Player',
-      status: 'Sandbox',
-      description: 'Suno control module. Tests real module behaviour inside Nova.'
+  const themes = {
+    violet: {
+      name: 'Violet Cyber',
+      primary: '#7c4dff',
+      secondary: '#00e5ff',
+      glow: 'rgba(124, 77, 255, 0.65)',
+      panelGlow: 'rgba(0, 229, 255, 0.55)'
     },
-    {
-      id: 'spp',
-      icon: '📦',
-      name: 'SPP Recovery',
-      status: 'Planned',
-      description: 'Future module for SPP jam recovery, SP00 printing and condition logic.'
+    venom: {
+      name: 'Venom Green',
+      primary: '#39ff14',
+      secondary: '#00e5ff',
+      glow: 'rgba(57, 255, 20, 0.65)',
+      panelGlow: 'rgba(0, 229, 255, 0.55)'
     },
-    {
-      id: 'floor',
-      icon: '🧭',
-      name: 'Floor Mismatch',
-      status: 'Planned',
-      description: 'Future module for Rodeo, FCResearch and floor/pod mismatch checks.'
-    },
-    {
-      id: 'collection',
-      icon: '🧺',
-      name: 'Collection',
-      status: 'Planned',
-      description: 'Future module for collection visibility, scans and workflow support.'
-    },
-    {
-      id: 'eagle',
-      icon: '👁',
-      name: 'Eagle Eye',
-      status: 'Planned',
-      description: 'Future module for Eagle Eye lookups, carts, hierarchy and shipment checks.'
+    fire: {
+      name: 'Fire Core',
+      primary: '#ff3d00',
+      secondary: '#ffea00',
+      glow: 'rgba(255, 61, 0, 0.65)',
+      panelGlow: 'rgba(255, 234, 0, 0.45)'
     }
-  ];
+  };
 
-  let modulesOpen = false;
+  if (!window.NovaTheme || typeof NovaTheme.inject !== 'function') {
+    console.error('[Nova Bootstrap] NovaTheme not found');
+    return;
+  }
+
+  NovaTheme.inject();
 
   function loadJson(key, fallback) {
     try {
       return JSON.parse(localStorage.getItem(key)) || fallback;
-    } catch (err) {
-      console.warn(`Nova: failed to load ${key}`, err);
+    } catch {
       return fallback;
     }
   }
@@ -90,10 +63,49 @@
 
   const activeModules = loadJson(ACTIVE_MODULES_KEY, {});
   let currentThemeId = localStorage.getItem(THEME_KEY) || 'violet';
+  let modulesOpen = false;
 
   function getTheme() {
     return themes[currentThemeId] || themes.violet;
   }
+
+  const modules = [
+    {
+      id: 'player',
+      icon: '🎵',
+      name: 'Nova Player',
+      status: 'Sandbox',
+      description: 'Suno control module.'
+    },
+    {
+      id: 'spp',
+      icon: '📦',
+      name: 'SPP Recovery',
+      status: 'Planned',
+      description: 'Future SPP jam recovery module.'
+    },
+    {
+      id: 'floor',
+      icon: '🧭',
+      name: 'Floor Mismatch',
+      status: 'Planned',
+      description: 'Future floor mismatch investigation module.'
+    },
+    {
+      id: 'collection',
+      icon: '🧺',
+      name: 'Collection',
+      status: 'Planned',
+      description: 'Future collection visibility module.'
+    },
+    {
+      id: 'eagle',
+      icon: '👁',
+      name: 'Eagle Eye',
+      status: 'Planned',
+      description: 'Future Eagle Eye lookup module.'
+    }
+  ];
 
   const box = document.createElement('div');
   box.id = 'nova-bootstrap';
@@ -123,7 +135,7 @@
     :root {
       --nova-primary: #7c4dff;
       --nova-secondary: #00e5ff;
-      --nova-glow: rgba(124, 77, 255, 0.65);
+      --nova-glow-main: rgba(124, 77, 255, 0.65);
       --nova-panel-glow: rgba(0, 229, 255, 0.55);
     }
 
@@ -133,10 +145,10 @@
       bottom: 24px;
       width: 340px;
       background: #10101a;
-      color: #fff;
+      color: white;
       border: 1px solid var(--nova-primary);
       border-radius: 16px;
-      box-shadow: 0 0 24px var(--nova-glow);
+      box-shadow: 0 0 24px var(--nova-glow-main);
       font-family: Arial, sans-serif;
       z-index: 999999;
       overflow: hidden;
@@ -173,16 +185,19 @@
       margin-bottom: 10px;
     }
 
-    .nova-main-btn {
+    .nova-main-btn,
+    .nova-toggle,
+    .nova-theme-apply,
+    .nova-player-btn {
       width: 100%;
-      padding: 10px;
+      padding: 9px;
       border: none;
       border-radius: 10px;
       background: var(--nova-primary);
       color: white;
       font-weight: bold;
       cursor: pointer;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     .nova-secondary-btn {
@@ -196,13 +211,6 @@
       margin-top: 8px;
       border-radius: 10px;
       background: rgba(255,255,255,0.08);
-      transition: 0.15s;
-    }
-
-    .nova-module:hover,
-    .nova-theme-card:hover {
-      background: color-mix(in srgb, var(--nova-primary) 35%, transparent);
-      transform: translateY(-1px);
     }
 
     .nova-module-title,
@@ -227,19 +235,6 @@
       font-size: 11px;
       opacity: 0.75;
       line-height: 1.35;
-    }
-
-    .nova-toggle,
-    .nova-theme-apply {
-      margin-top: 8px;
-      width: 100%;
-      padding: 7px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: bold;
-      color: white;
-      background: var(--nova-primary);
     }
 
     .nova-toggle-on {
@@ -278,7 +273,6 @@
       padding: 12px;
       font-size: 12px;
       line-height: 1.4;
-      opacity: 0.9;
     }
 
     .nova-mini-close {
@@ -296,20 +290,6 @@
       grid-template-columns: repeat(3, 1fr);
       gap: 8px;
       margin-top: 10px;
-    }
-
-    .nova-player-btn {
-      padding: 9px;
-      border: none;
-      border-radius: 10px;
-      background: var(--nova-primary);
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    .nova-player-btn:hover {
-      background: var(--nova-secondary);
     }
 
     .nova-player-status {
@@ -343,13 +323,13 @@
     const theme = getTheme();
     document.documentElement.style.setProperty('--nova-primary', theme.primary);
     document.documentElement.style.setProperty('--nova-secondary', theme.secondary);
-    document.documentElement.style.setProperty('--nova-glow', theme.glow);
+    document.documentElement.style.setProperty('--nova-glow-main', theme.glow);
     document.documentElement.style.setProperty('--nova-panel-glow', theme.panelGlow);
   }
 
   function renderHome() {
-    const content = document.getElementById('nova-content');
-    content.innerHTML = `<div class="nova-hint">Click Modules to open Nova Module Manager.</div>`;
+    document.getElementById('nova-content').innerHTML =
+      `<div class="nova-hint">Click Modules to open Nova Module Manager.</div>`;
     modulesOpen = false;
   }
 
@@ -364,7 +344,9 @@
           <span class="nova-theme-status">${id === currentThemeId ? 'Active' : 'Theme'}</span>
         </div>
         <div class="nova-theme-desc">Primary: ${theme.primary} | Secondary: ${theme.secondary}</div>
-        <button class="nova-theme-apply" data-theme-id="${id}">${id === currentThemeId ? 'Current Theme' : 'Apply Theme'}</button>
+        <button class="nova-theme-apply" data-theme-id="${id}">
+          ${id === currentThemeId ? 'Current Theme' : 'Apply Theme'}
+        </button>
       </div>
     `).join('');
 
@@ -382,6 +364,7 @@
 
     content.innerHTML = modules.map(module => {
       const isActive = !!activeModules[module.id];
+
       return `
         <div class="nova-module">
           <div class="nova-module-title">
@@ -424,11 +407,9 @@
     panel.className = 'nova-floating-module';
     panel.id = `nova-panel-${moduleId}`;
 
-    if (moduleId === 'player') {
-      panel.innerHTML = createPlayerPanel(module);
-    } else {
-      panel.innerHTML = createPlaceholderPanel(module);
-    }
+    panel.innerHTML = moduleId === 'player'
+      ? createPlayerPanel(module)
+      : createPlaceholderPanel(module);
 
     panelArea.appendChild(panel);
 
@@ -436,27 +417,33 @@
       activeModules[moduleId] = false;
       saveJson(ACTIVE_MODULES_KEY, activeModules);
       hideModule(moduleId);
-
-      if (modulesOpen) {
-        renderModules();
-      }
+      if (modulesOpen) renderModules();
     };
 
-    if (moduleId === 'player') {
-      wirePlayerButtons();
-    }
+    if (moduleId === 'player') wirePlayerButtons();
+  }
+
+  function hideModule(moduleId) {
+    const panel = document.getElementById(`nova-panel-${moduleId}`);
+    if (panel) panel.remove();
+  }
+
+  function restoreActiveModules() {
+    modules.forEach(module => {
+      if (activeModules[module.id]) showModule(module.id);
+    });
   }
 
   function createPlaceholderPanel(module) {
     return `
       <div class="nova-floating-header">
         <span>${module.icon} ${module.name}</span>
-        <button class="nova-mini-close" data-module-id="${module.id}" title="Turn module off">×</button>
+        <button class="nova-mini-close" title="Turn module off">×</button>
       </div>
       <div class="nova-floating-body">
         <strong>Status:</strong> ${module.status}<br><br>
         ${module.description}<br><br>
-        This is a live placeholder panel. Later this will become the real ${module.name} module.
+        This is a live placeholder panel.
       </div>
     `;
   }
@@ -465,7 +452,7 @@
     return `
       <div class="nova-floating-header">
         <span>${module.icon} ${module.name}</span>
-        <button class="nova-mini-close" data-module-id="${module.id}" title="Turn module off">×</button>
+        <button class="nova-mini-close" title="Turn module off">×</button>
       </div>
       <div class="nova-floating-body">
         <strong>Status:</strong> ${module.status}<br>
@@ -485,19 +472,6 @@
         </div>
       </div>
     `;
-  }
-
-  function hideModule(moduleId) {
-    const panel = document.getElementById(`nova-panel-${moduleId}`);
-    if (panel) panel.remove();
-  }
-
-  function restoreActiveModules() {
-    modules.forEach(module => {
-      if (activeModules[module.id]) {
-        showModule(module.id);
-      }
-    });
   }
 
   function getButtonName(button) {
@@ -616,5 +590,5 @@
   applyTheme(currentThemeId);
   restoreActiveModules();
 
-  console.log(`Nova Bootstrap v${NOVA_VERSION} loaded`);
+  console.log(`[Nova Bootstrap] v${NOVA_VERSION} loaded`);
 })();
