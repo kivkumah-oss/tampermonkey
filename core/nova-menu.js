@@ -68,8 +68,8 @@
     const panel = document.createElement('div');
     panel.id = MENU_ID;
     panel.style.cssText = [
-      'position:fixed', 'right:16px', 'bottom:64px', 'width:min(420px,calc(100vw - 32px))',
-      'max-height:min(720px,calc(100vh - 96px))', 'overflow:hidden', 'z-index:2147483646',
+      'position:fixed', 'right:16px', 'bottom:64px', 'width:min(430px,calc(100vw - 32px))',
+      'max-height:min(760px,calc(100vh - 96px))', 'overflow:hidden', 'z-index:2147483646',
       'background:rgba(10,10,18,.97)', 'color:#fff', 'border:1px solid rgba(168,85,247,.5)',
       'box-shadow:0 0 22px rgba(168,85,247,.5)', 'border-radius:14px', 'font:12px Arial,sans-serif',
       'display:none'
@@ -157,9 +157,7 @@
 
   function renderDomControls() {
     const hasDom = Boolean(window.NovaDOMInspector);
-    const summary = hasDom && typeof window.NovaDOMInspector.summary === 'function'
-      ? window.NovaDOMInspector.summary()
-      : null;
+    const summary = hasDom && typeof window.NovaDOMInspector.summary === 'function' ? window.NovaDOMInspector.summary() : null;
     const counts = summary ? summary.counts : { totalElements: 0, buttons: 0, inputs: 0, links: 0, tables: 0 };
 
     return `
@@ -178,6 +176,32 @@
           <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:15px;font-weight:700;">${counts.inputs || 0}</div><div style="color:#9ca3af;">Inputs</div></div>
           <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:15px;font-weight:700;">${counts.links || 0}</div><div style="color:#9ca3af;">Links</div></div>
           <div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:15px;font-weight:700;">${counts.tables || 0}</div><div style="color:#9ca3af;">Tables</div></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderBundleControls() {
+    const hasBundle = Boolean(window.NovaInvestigationExport);
+    const summary = hasBundle && typeof window.NovaInvestigationExport.summary === 'function'
+      ? window.NovaInvestigationExport.summary()
+      : null;
+    const traceEvents = summary && summary.traceStatus ? summary.traceStatus.localEvents || 0 : 0;
+    const domElements = summary && summary.domCounts ? summary.domCounts.totalElements || 0 : 0;
+    const sessionEvents = summary && summary.sessionStats ? summary.sessionStats.events || 0 : 0;
+
+    return `
+      <div style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;">
+          <div style="font-weight:700;color:#f0abfc;text-transform:uppercase;font-size:11px;letter-spacing:.06em;">Investigation Bundle</div>
+          <div style="font-weight:700;color:${hasBundle ? '#22c55e' : '#f87171'};text-transform:uppercase;font-size:11px;">● ${hasBundle ? 'ready' : 'missing'}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button data-nova-bundle-summary style="${buttonStyle('rgba(240,171,252,.65)')}">Copy Summary Bundle</button>
+          <button data-nova-bundle-extended style="${buttonStyle('rgba(168,85,247,.65)')}">Copy Extended Bundle</button>
+        </div>
+        <div style="color:#9ca3af;margin-top:8px;line-height:1.35;">
+          Bundle: session ${sessionEvents} events · trace ${traceEvents} local events · DOM ${domElements} elements
         </div>
       </div>
     `;
@@ -217,7 +241,8 @@
       ${renderSessionStatus()}
       ${renderTraceControls()}
       ${renderDomControls()}
-      <div style="padding:10px;overflow:auto;max-height:160px;">
+      ${renderBundleControls()}
+      <div style="padding:10px;overflow:auto;max-height:120px;">
         <div style="color:#9ca3af;margin-bottom:10px;">Build: ${escapeHtml((window.Nova && window.Nova.build) || 'unknown')}</div>
         ${body}
       </div>
@@ -238,6 +263,8 @@
     bind('[data-nova-trace-copy]', () => { if (window.NovaTraceNetwork) { window.NovaTraceNetwork.copy(); emit('trace-copy', 'Trace copied from menu'); } });
     bind('[data-nova-dom-summary]', () => { if (window.NovaDOMInspector) { const snapshot = window.NovaDOMInspector.summary(); navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2)); emit('dom-summary-copy', 'DOM summary copied from menu', snapshot.counts); render(); } });
     bind('[data-nova-dom-full]', () => { if (window.NovaDOMInspector) { window.NovaDOMInspector.copy(); emit('dom-full-copy', 'Full DOM snapshot copied from menu'); render(); } });
+    bind('[data-nova-bundle-summary]', () => { if (window.NovaInvestigationExport) { window.NovaInvestigationExport.copy(); emit('bundle-summary-copy', 'Summary bundle copied from menu'); render(); } });
+    bind('[data-nova-bundle-extended]', () => { if (window.NovaInvestigationExport) { window.NovaInvestigationExport.copyFull(); emit('bundle-extended-copy', 'Extended bundle copied from menu'); render(); } });
   }
 
   function startLiveRefresh() {
