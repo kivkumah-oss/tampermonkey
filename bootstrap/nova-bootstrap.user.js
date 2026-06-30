@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      0.9.0
+// @version      1.0.0
 // @description  Nova Core bootstrap loader
 // @author       Nova
 // @match        *://*/*
@@ -14,6 +14,7 @@
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js
 // ==/UserScript==
 
 (function () {
@@ -22,8 +23,8 @@
   const REGISTRY_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/modules.registry.json';
 
   window.Nova = window.Nova || {};
-  window.Nova.version = '0.9.0';
-  window.Nova.build = 'mission-020-memory-panel';
+  window.Nova.version = '1.0.0';
+  window.Nova.build = 'mission-021-memory-autolearn';
   window.Nova.loadedAt = new Date().toISOString();
   window.Nova.registryUrl = REGISTRY_URL;
   window.Nova.registry = null;
@@ -33,6 +34,7 @@
     theme: window.NovaTheme || null,
     session: window.NovaSession || null,
     memory: window.NovaMemory || null,
+    memoryAutoLearn: window.NovaMemoryAutoLearn || null,
     traceNetwork: window.NovaTraceNetwork || null,
     domInspector: window.NovaDOMInspector || null,
     investigationExport: window.NovaInvestigationExport || null,
@@ -51,12 +53,8 @@
 
       console.log('[Nova Core] Module registry loaded', window.Nova.modulesRegistry.length, 'modules');
 
-      if (window.NovaMenu && typeof window.NovaMenu.refresh === 'function') {
-        window.NovaMenu.refresh();
-      }
-      if (window.NovaMemoryPanel && typeof window.NovaMemoryPanel.refresh === 'function') {
-        window.NovaMemoryPanel.refresh();
-      }
+      if (window.NovaMenu && typeof window.NovaMenu.refresh === 'function') window.NovaMenu.refresh();
+      if (window.NovaMemoryPanel && typeof window.NovaMemoryPanel.refresh === 'function') window.NovaMemoryPanel.refresh();
 
       if (window.NovaSession && window.NovaSession.isActive()) {
         window.NovaSession.addEvent({
@@ -93,6 +91,7 @@
     console.log('Theme:', Boolean(window.NovaTheme));
     console.log('Session:', Boolean(window.NovaSession));
     console.log('Memory:', Boolean(window.NovaMemory));
+    console.log('Memory AutoLearn:', Boolean(window.NovaMemoryAutoLearn));
     console.log('Trace Network:', Boolean(window.NovaTraceNetwork));
     console.log('DOM Inspector:', Boolean(window.NovaDOMInspector));
     console.log('Investigation Export:', Boolean(window.NovaInvestigationExport));
@@ -102,9 +101,7 @@
     console.groupEnd();
   }
 
-  if (window.NovaTheme && typeof window.NovaTheme.inject === 'function') {
-    window.NovaTheme.inject();
-  }
+  if (window.NovaTheme && typeof window.NovaTheme.inject === 'function') window.NovaTheme.inject();
 
   if (window.NovaSession && window.NovaSession.isActive()) {
     window.NovaSession.addEvent({
