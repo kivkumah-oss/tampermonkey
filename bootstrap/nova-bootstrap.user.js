@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      0.7.0
+// @version      0.8.0
 // @description  Nova Core bootstrap loader
 // @author       Nova
 // @match        *://*/*
 // @grant        none
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js
@@ -20,8 +21,8 @@
   const REGISTRY_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/modules.registry.json';
 
   window.Nova = window.Nova || {};
-  window.Nova.version = '0.7.0';
-  window.Nova.build = 'mission-017-investigation-export';
+  window.Nova.version = '0.8.0';
+  window.Nova.build = 'mission-019-memory';
   window.Nova.loadedAt = new Date().toISOString();
   window.Nova.registryUrl = REGISTRY_URL;
   window.Nova.registry = null;
@@ -30,6 +31,7 @@
   window.Nova.core = {
     theme: window.NovaTheme || null,
     session: window.NovaSession || null,
+    memory: window.NovaMemory || null,
     traceNetwork: window.NovaTraceNetwork || null,
     domInspector: window.NovaDOMInspector || null,
     investigationExport: window.NovaInvestigationExport || null,
@@ -85,6 +87,7 @@
     console.log('Version:', window.Nova.version);
     console.log('Theme:', Boolean(window.NovaTheme));
     console.log('Session:', Boolean(window.NovaSession));
+    console.log('Memory:', Boolean(window.NovaMemory));
     console.log('Trace Network:', Boolean(window.NovaTraceNetwork));
     console.log('DOM Inspector:', Boolean(window.NovaDOMInspector));
     console.log('Investigation Export:', Boolean(window.NovaInvestigationExport));
