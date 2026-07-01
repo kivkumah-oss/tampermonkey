@@ -5,7 +5,7 @@
 
   if (window.NovaMenu) return;
 
-  const VERSION = '2.1.0';
+  const VERSION = '2.1.1';
   const ORB_ID = 'nova-modules-button';
   const MENU_ID = 'nova-modules-menu';
   const POS_KEY = 'nova.orb.position';
@@ -177,6 +177,37 @@
     return `<div style="background:rgba(255,255,255,.05);border-radius:9px;padding:7px;text-align:center;"><div style="font-size:16px;font-weight:900;">${esc(value)}</div><div style="color:#9ca3af;">${esc(label)}</div></div>`;
   }
 
+  function renderThemeCard() {
+    const api = window.NovaTheme;
+    if (!api || !api.getThemes) {
+      return `
+        <div style="${cardStyle('rgba(250,204,21,.25)')}">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b style="color:#facc15;text-transform:uppercase;letter-spacing:.06em;">Themes</b><b style="color:#f87171;text-transform:uppercase;">● missing</b></div>
+          <div style="color:#9ca3af;line-height:1.4;">NovaTheme is not loaded yet.</div>
+        </div>`;
+    }
+
+    const themes = api.getThemes();
+    const current = api.getCurrentThemeId ? api.getCurrentThemeId() : api.current().name;
+    const currentTheme = themes[current] || {};
+    const buttons = Object.entries(themes).map(([id, theme]) => {
+      const active = id === current;
+      const border = active ? 'rgba(34,197,94,.7)' : theme.border || 'rgba(255,255,255,.18)';
+      return `
+        <button data-nova-theme="${esc(id)}" title="${esc(theme.description || '')}" style="${btnStyle(border)}display:flex;align-items:center;gap:7px;justify-content:flex-start;min-height:34px;${active ? 'box-shadow:0 0 12px rgba(34,197,94,.35);' : ''}">
+          <span style="display:inline-block;width:24px;height:10px;border-radius:99px;border:1px solid rgba(255,255,255,.35);background:linear-gradient(90deg,${esc(theme.accent)},${esc(theme.accent2)});"></span>
+          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${active ? '✓ ' : ''}${esc(theme.name || id)}</span>
+        </button>`;
+    }).join('');
+
+    return `
+      <div style="${cardStyle('rgba(34,211,238,.25)')}">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b style="color:#22d3ee;text-transform:uppercase;letter-spacing:.06em;">Themes</b><b style="color:#22c55e;text-transform:uppercase;">● ${esc(current)}</b></div>
+        <div style="color:#d1d5db;margin-bottom:8px;line-height:1.35;">${esc(currentTheme.description || 'Pick Nova style.')}</div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;">${buttons}</div>
+      </div>`;
+  }
+
   function renderSessionCard() {
     const info = getSessionInfo();
     const color = info.status === 'recording' ? '#22c55e' : info.status === 'paused' ? '#facc15' : '#f87171';
@@ -257,7 +288,7 @@
 
   function renderAdvanced() {
     const build = window.Nova ? window.Nova.build || 'unknown' : 'missing';
-    return renderSessionCard() + renderTraceCard() + renderDomCard() + renderBundleCard() + `<div style="color:#9ca3af;margin:8px 0 10px;line-height:1.35;">Build: ${esc(build)}</div>` + renderCoreCard();
+    return renderThemeCard() + renderSessionCard() + renderTraceCard() + renderDomCard() + renderBundleCard() + `<div style="color:#9ca3af;margin:8px 0 10px;line-height:1.35;">Build: ${esc(build)}</div>` + renderCoreCard();
   }
 
   function render() {
@@ -285,6 +316,7 @@
     panel.querySelectorAll('[data-nova-launch]').forEach((btn) => btn.addEventListener('click', () => launchModule(btn.dataset.novaLaunch)));
     panel.querySelectorAll('[data-nova-hide]').forEach((btn) => btn.addEventListener('click', () => hideModule(btn.dataset.novaHide)));
     panel.querySelectorAll('[data-nova-act]').forEach((btn) => btn.addEventListener('click', () => advancedAction(btn.dataset.novaAct)));
+    panel.querySelectorAll('[data-nova-theme]').forEach((btn) => btn.addEventListener('click', () => setTheme(btn.dataset.novaTheme)));
   }
 
   async function launchModule(id) {
@@ -304,6 +336,13 @@
     const mod = userModules().find((m) => m.id === id);
     if (mod && mod.api && window[mod.api] && window[mod.api].hide) window[mod.api].hide();
     setTimeout(render, 250);
+  }
+
+  function setTheme(id) {
+    if (!window.NovaTheme || !window.NovaTheme.setActive) return;
+    const ok = window.NovaTheme.setActive(id);
+    if (ok) emit('theme-change', 'Nova theme changed from menu', { id });
+    setTimeout(render, 50);
   }
 
   function advancedAction(action) {
@@ -331,7 +370,7 @@
     hide() { if (state.panel) state.panel.style.display = 'none'; state.open = false; },
     toggle() { if (state.open) this.hide(); else this.show(); },
     refresh() { if (state.open) render(); },
-    init() { createOrb(); console.log('[Nova Core] NovaMenu UI 2.1 loaded'); }
+    init() { createOrb(); console.log('[Nova Core] NovaMenu UI 2.1.1 loaded'); }
   };
 
   if (document.body) window.NovaMenu.init();
