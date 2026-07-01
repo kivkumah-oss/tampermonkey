@@ -1,24 +1,25 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      1.4.8
+// @version      1.4.9
 // @description  Nova Core bootstrap loader
 // @author       Nova
 // @match        *://*/*
 // @grant        none
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js?v=148
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js?v=148
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory.js?v=148
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js?v=148
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js?v=148
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js?v=148
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js?v=148
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-orb-extras.js?v=148
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js?v=148
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js?v=148
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js?v=148
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js?v=148
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js?v=148
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-api-body-catcher.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-orb-extras.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js?v=149
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js?v=149
 // ==/UserScript==
 
 (function () {
@@ -27,8 +28,8 @@
   const REGISTRY_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/modules.registry.json';
 
   window.Nova = window.Nova || {};
-  window.Nova.version = '1.4.8';
-  window.Nova.build = 'mission-031-api-catcher';
+  window.Nova.version = '1.4.9';
+  window.Nova.build = 'mission-032-api-body-catcher';
   window.Nova.loadedAt = new Date().toISOString();
   window.Nova.registryUrl = REGISTRY_URL;
   window.Nova.registry = null;
@@ -42,6 +43,7 @@
     brain: window.NovaBrain || null,
     traceNetwork: window.NovaTraceNetwork || null,
     apiCatcher: window.NovaApiCatcher || window.NovaTraceNetwork || null,
+    apiBodyCatcher: window.NovaApiBodyCatcher || null,
     domInspector: window.NovaDOMInspector || null,
     investigationExport: window.NovaInvestigationExport || null,
     menu: window.NovaMenu || null,
@@ -89,6 +91,7 @@
     console.log('Memory AutoLearn:', Boolean(window.NovaMemoryAutoLearn));
     console.log('Brain:', Boolean(window.NovaBrain));
     console.log('API Catcher:', Boolean(window.NovaApiCatcher || window.NovaTraceNetwork));
+    console.log('API Body Catcher:', Boolean(window.NovaApiBodyCatcher));
     console.log('DOM Inspector:', Boolean(window.NovaDOMInspector));
     console.log('Investigation Export:', Boolean(window.NovaInvestigationExport));
     console.log('Menu:', Boolean(window.NovaMenu));
