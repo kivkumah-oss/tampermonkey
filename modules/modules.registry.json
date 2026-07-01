@@ -1,6 +1,6 @@
 {
-  "version": "0.8.0",
-  "updatedAt": "2026-06-30",
+  "version": "0.9.0",
+  "updatedAt": "2026-07-01",
   "modules": [
     {
       "id": "nova-session",
@@ -64,6 +64,17 @@
       "enabled": true,
       "core": true,
       "api": "NovaMenu"
+    },
+    {
+      "id": "nova-suno-player",
+      "name": "Nova Suno Player",
+      "description": "Floating Suno music controller module for play, pause, next, previous, shuffle, and lyrics experiments.",
+      "type": "module",
+      "enabled": true,
+      "core": false,
+      "api": "NovaSunoPlayer",
+      "match": ["https://suno.com/*"],
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-player.js"
     },
     {
       "id": "nova-trace",
