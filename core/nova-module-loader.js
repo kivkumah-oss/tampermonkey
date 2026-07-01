@@ -5,33 +5,37 @@
 
   if (window.NovaModuleLoader) return;
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
   const loaded = new Set();
+
+  function matchOne(pattern) {
+    const value = String(pattern || '');
+    if (!value) return true;
+    if (value.endsWith('*')) return location.href.startsWith(value.slice(0, -1));
+    return location.href === value || location.href.startsWith(value);
+  }
 
   function matches(patterns) {
     if (!Array.isArray(patterns) || !patterns.length) return true;
-    return patterns.some((pattern) => {
-      const rx = new RegExp('^' + String(pattern).replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
-      return rx.test(location.href);
-    });
+    return patterns.some(matchOne);
   }
 
   function emit(type, summary, data) {
     if (!window.NovaSession || !window.NovaSession.isActive()) return;
-    window.NovaSession.addEvent({
-      module: 'module-loader',
-      type,
-      summary,
-      data: data || {}
-    });
+    window.NovaSession.addEvent({ module: 'module-loader', type, summary, data: data || {} });
   }
 
-  function loadScript(module) {
+  function canLoad(module) {
     if (!module || !module.id || !module.url) return false;
-    if (loaded.has(module.id)) return true;
     if (module.enabled === false) return false;
     if (module.core) return false;
     if (!matches(module.match)) return false;
+    return true;
+  }
+
+  function loadScript(module) {
+    if (!canLoad(module)) return false;
+    if (loaded.has(module.id)) return true;
 
     const script = document.createElement('script');
     script.src = module.url + (module.url.includes('?') ? '&' : '?') + 'ts=' + Date.now();
@@ -54,17 +58,11 @@
     const modules = window.Nova && Array.isArray(window.Nova.modulesRegistry) ? window.Nova.modulesRegistry : [];
     let count = 0;
     modules.forEach((module) => {
-      if (loadScript(module)) count += 1;
+      if (module.autoload === true && loadScript(module)) count += 1;
     });
     return count;
   }
 
-  window.NovaModuleLoader = {
-    version: VERSION,
-    loaded,
-    loadMatching,
-    loadScript
-  };
-
+  window.NovaModuleLoader = { version: VERSION, loaded, matches, canLoad, loadMatching, loadScript };
   console.log('[Nova Core] NovaModuleLoader loaded');
 })();
