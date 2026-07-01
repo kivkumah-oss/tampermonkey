@@ -1,23 +1,24 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      1.4.5
+// @version      1.4.6
 // @description  Nova Core bootstrap loader
 // @author       Nova
 // @match        *://*/*
 // @grant        none
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js?v=145
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js?v=145
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory.js?v=145
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js?v=145
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js?v=145
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js?v=145
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js?v=145
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js?v=145
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js?v=145
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js?v=145
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js?v=145
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js?v=145
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js?v=146
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js?v=146
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory.js?v=146
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js?v=146
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js?v=146
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js?v=146
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js?v=146
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-orb-extras.js?v=146
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js?v=146
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js?v=146
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js?v=146
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js?v=146
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js?v=146
 // ==/UserScript==
 
 (function () {
@@ -26,8 +27,8 @@
   const REGISTRY_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/modules.registry.json';
 
   window.Nova = window.Nova || {};
-  window.Nova.version = '1.4.5';
-  window.Nova.build = 'mission-028-devkit-copy-restore';
+  window.Nova.version = '1.4.6';
+  window.Nova.build = 'mission-029-suno-player-orb-extras';
   window.Nova.loadedAt = new Date().toISOString();
   window.Nova.registryUrl = REGISTRY_URL;
   window.Nova.registry = null;
@@ -43,6 +44,7 @@
     domInspector: window.NovaDOMInspector || null,
     investigationExport: window.NovaInvestigationExport || null,
     menu: window.NovaMenu || null,
+    orbExtras: window.NovaOrbExtras || null,
     memoryPanel: window.NovaMemoryPanel || null,
     windowManager: window.NovaWindowManager || null,
     moduleLoader: window.NovaModuleLoader || null
@@ -89,6 +91,7 @@
     console.log('DOM Inspector:', Boolean(window.NovaDOMInspector));
     console.log('Investigation Export:', Boolean(window.NovaInvestigationExport));
     console.log('Menu:', Boolean(window.NovaMenu));
+    console.log('Orb Extras:', Boolean(window.NovaOrbExtras));
     console.log('Memory Panel:', Boolean(window.NovaMemoryPanel));
     console.log('Window Manager:', Boolean(window.NovaWindowManager));
     console.log('Module Loader:', Boolean(window.NovaModuleLoader));
@@ -97,6 +100,7 @@
   }
 
   if (window.NovaTheme && typeof window.NovaTheme.inject === 'function') window.NovaTheme.inject();
+  if (window.NovaOrbExtras && typeof window.NovaOrbExtras.scan === 'function') window.NovaOrbExtras.scan();
   if (window.NovaSession && window.NovaSession.isActive()) window.NovaSession.addEvent({ module: 'bootstrap', type: 'load', summary: 'Nova Bootstrap loaded', data: { version: window.Nova.version, pageUrl: location.href } });
   loadRegistry();
   logStatus();
