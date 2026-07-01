@@ -4,7 +4,7 @@
 
   if (window.NovaTraceNetwork) return;
 
-  const VERSION = '0.5.0-api-catcher';
+  const VERSION = '0.5.1-idle-safe';
   const TRACE_ACTIVE_KEY = 'nova.trace.active';
   const TRACE_STARTED_AT_KEY = 'nova.trace.startedAt';
   const TRACE_PAGE_COUNT_KEY = 'nova.trace.pageCount';
@@ -12,6 +12,8 @@
   const MAX_TEXT_CHARS = 240000;
   const MAX_SHAPE_DEPTH = 4;
   const MAX_KEYS = 45;
+  const AUTO_RESUME_MAX_MINUTES = 30;
+  const AUTO_RESUME_MAX_PAGES = 20;
 
   const state = {
     logs: [],
@@ -44,6 +46,11 @@
   function getStore(key) {
     try { return localStorage.getItem(key); }
     catch (error) { return null; }
+  }
+
+  function removeStore(key) {
+    try { localStorage.removeItem(key); }
+    catch (error) {}
   }
 
   function now() {
@@ -284,6 +291,7 @@
   }
 
   function shouldCaptureResponse(contentType, contentLength) {
+    if (!state.enabled) return { ok: false, reason: 'catcher-idle' };
     if (!state.captureResponseShapes) return { ok: false, reason: 'disabled' };
     if (Number.isFinite(contentLength) && contentLength > MAX_TEXT_CHARS) return { ok: false, reason: 'too-large', contentLength };
     const type = String(contentType || '').toLowerCase();
@@ -300,6 +308,7 @@
       const decision = shouldCaptureResponse(contentType, contentLength);
       if (!decision.ok) return { captured: false, ...decision };
       const text = await response.clone().text();
+      if (!state.enabled) return { captured: false, reason: 'catcher-stopped-during-read' };
       if (text.length > MAX_TEXT_CHARS) return { captured: false, reason: 'too-large-after-read', textLength: text.length };
       return { contentType, ...jsonShapeFromText(text) };
     } catch (error) {
@@ -309,6 +318,7 @@
 
   function captureXhrResponseShape(xhr, contentType) {
     try {
+      if (!state.enabled) return { captured: false, reason: 'catcher-idle' };
       if (xhr.responseType && xhr.responseType !== 'text') {
         return { captured: false, reason: 'xhr-responseType-' + xhr.responseType };
       }
@@ -326,6 +336,8 @@
     if (!window.fetch || window.fetch.__novaApiCatcherHooked) return;
 
     window.fetch = async function novaApiCatcherFetch(input, init = {}) {
+      if (!state.enabled) return state.originalFetch.apply(this, arguments);
+
       const info = requestInfo('fetch', input, init || {});
       const started = performance.now();
 
@@ -343,9 +355,13 @@
           responseHeaders: headerInfo(response.headers)
         };
 
-        captureFetchResponseShape(response).then((shape) => {
-          add('api-response', { ...base, response: shape });
-        });
+        if (state.enabled && state.captureResponseShapes) {
+          captureFetchResponseShape(response).then((shape) => {
+            if (state.enabled) add('api-response', { ...base, response: shape });
+          });
+        } else {
+          add('api-response', { ...base, response: { captured: false, reason: state.enabled ? 'disabled' : 'catcher-idle' } });
+        }
 
         return response;
       } catch (error) {
@@ -361,6 +377,11 @@
     if (XMLHttpRequest.prototype.open.__novaApiCatcherHooked) return;
 
     XMLHttpRequest.prototype.open = function novaApiCatcherXhrOpen(method, url) {
+      if (!state.enabled) {
+        this.__novaApiCatcher = null;
+        return state.originalXhrOpen.apply(this, arguments);
+      }
+
       const safe = safeUrl(url);
       this.__novaApiCatcher = {
         id: nextId(),
@@ -393,6 +414,8 @@
     };
 
     XMLHttpRequest.prototype.send = function novaApiCatcherXhrSend(body) {
+      if (!state.enabled) return state.originalXhrSend.apply(this, arguments);
+
       const trace = this.__novaApiCatcher || requestInfo('xhr', 'unknown', {});
       trace.started = performance.now();
       trace.requestBody = requestBodyShape(body);
@@ -400,6 +423,7 @@
       add('api-request', trace);
 
       this.addEventListener('loadend', () => {
+        if (!state.enabled) return;
         const contentType = this.getResponseHeader ? this.getResponseHeader('content-type') || '' : '';
         add('api-response', {
           ...trace,
@@ -427,6 +451,38 @@
     const next = current + 1;
     setStore(TRACE_PAGE_COUNT_KEY, String(next));
     return next;
+  }
+
+  function clearPersistedTrace(reason) {
+    writeFlag(TRACE_ACTIVE_KEY, false);
+    removeStore(TRACE_STARTED_AT_KEY);
+    removeStore(TRACE_PAGE_COUNT_KEY);
+    console.log('[Nova API Catcher] Auto-resume disabled:', reason);
+  }
+
+  function shouldAutoResume() {
+    if (!readFlag(TRACE_ACTIVE_KEY)) return false;
+
+    const startedRaw = getStore(TRACE_STARTED_AT_KEY);
+    const startedAt = Date.parse(startedRaw || '');
+    if (!Number.isFinite(startedAt)) {
+      clearPersistedTrace('missing start time');
+      return false;
+    }
+
+    const ageMs = Date.now() - startedAt;
+    if (ageMs > AUTO_RESUME_MAX_MINUTES * 60 * 1000) {
+      clearPersistedTrace('expired after ' + AUTO_RESUME_MAX_MINUTES + ' minutes');
+      return false;
+    }
+
+    const pages = Number(getStore(TRACE_PAGE_COUNT_KEY) || '0');
+    if (pages >= AUTO_RESUME_MAX_PAGES) {
+      clearPersistedTrace('page limit reached');
+      return false;
+    }
+
+    return true;
   }
 
   function enable(options = {}) {
@@ -558,7 +614,8 @@
     clear() {
       state.logs = [];
       state.requestSeq = 0;
-      try { localStorage.removeItem(TRACE_STARTED_AT_KEY); localStorage.removeItem(TRACE_PAGE_COUNT_KEY); } catch (error) {}
+      removeStore(TRACE_STARTED_AT_KEY);
+      removeStore(TRACE_PAGE_COUNT_KEY);
       add('catcher-clear', { url: location.href }, { always: true });
       console.log('[Nova API Catcher] Cleared');
     },
@@ -579,6 +636,8 @@
         autoResumed: state.autoResumed,
         startedAt: getStore(TRACE_STARTED_AT_KEY),
         pageCount: Number(getStore(TRACE_PAGE_COUNT_KEY) || '0'),
+        autoResumeMaxMinutes: AUTO_RESUME_MAX_MINUTES,
+        autoResumeMaxPages: AUTO_RESUME_MAX_PAGES,
         localEvents: state.logs.length,
         responseShapes: state.captureResponseShapes,
         maxLogs: MAX_LOGS,
@@ -623,7 +682,7 @@
 
   installHooks();
 
-  if (readFlag(TRACE_ACTIVE_KEY)) {
+  if (shouldAutoResume()) {
     state.autoResumed = true;
     setTimeout(() => {
       if (!state.enabled) {
