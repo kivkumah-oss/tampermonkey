@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      1.1.0
+// @version      1.2.0
 // @description  Nova Core bootstrap loader
 // @author       Nova
 // @match        *://*/*
@@ -16,6 +16,7 @@
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js
 // ==/UserScript==
 
 (function () {
@@ -24,8 +25,8 @@
   const REGISTRY_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/modules.registry.json';
 
   window.Nova = window.Nova || {};
-  window.Nova.version = '1.1.0';
-  window.Nova.build = 'mission-022-brain';
+  window.Nova.version = '1.2.0';
+  window.Nova.build = 'mission-024-window-manager';
   window.Nova.loadedAt = new Date().toISOString();
   window.Nova.registryUrl = REGISTRY_URL;
   window.Nova.registry = null;
@@ -41,7 +42,8 @@
     domInspector: window.NovaDOMInspector || null,
     investigationExport: window.NovaInvestigationExport || null,
     menu: window.NovaMenu || null,
-    memoryPanel: window.NovaMemoryPanel || null
+    memoryPanel: window.NovaMemoryPanel || null,
+    windowManager: window.NovaWindowManager || null
   };
 
   async function loadRegistry() {
@@ -57,6 +59,7 @@
 
       if (window.NovaMenu && typeof window.NovaMenu.refresh === 'function') window.NovaMenu.refresh();
       if (window.NovaMemoryPanel && typeof window.NovaMemoryPanel.refresh === 'function') window.NovaMemoryPanel.refresh();
+      if (window.NovaWindowManager && typeof window.NovaWindowManager.scan === 'function') window.NovaWindowManager.scan();
 
       if (window.NovaSession && window.NovaSession.isActive()) {
         window.NovaSession.addEvent({
@@ -100,6 +103,7 @@
     console.log('Investigation Export:', Boolean(window.NovaInvestigationExport));
     console.log('Menu:', Boolean(window.NovaMenu));
     console.log('Memory Panel:', Boolean(window.NovaMemoryPanel));
+    console.log('Window Manager:', Boolean(window.NovaWindowManager));
     console.log('Registry URL:', REGISTRY_URL);
     console.groupEnd();
   }
