@@ -1,0 +1,203 @@
+{
+  "version": "0.1.0",
+  "updatedAt": "2026-07-01",
+  "notes": "Phase 1 catalog only. Install URLs are intentionally blank until scripts are reviewed and moved to a safe/private module source.",
+  "tools": [
+    {
+      "id": "new-rodeo",
+      "name": "New Rodeo",
+      "category": "Rodeo",
+      "tier": "must-have",
+      "mode": "standalone-userscript",
+      "status": "needs-upload",
+      "backupName": "NewRodeo master JBUCHMUL remastered.user.js",
+      "description": "Main Rodeo helper candidate. Keep as standalone until we decide what parts become modules.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "Rodeo NCL1", "url": "https://rodeo-dub.amazon.com/NCL1/" },
+        { "label": "Rodeo ExSD", "url": "https://rodeo-dub.amazon.com/NCL1/ExSD" }
+      ],
+      "tags": ["rodeo", "core", "overage", "jp-dw"]
+    },
+    {
+      "id": "floor-mismatch",
+      "name": "Floor Mismatch Scanner",
+      "category": "Rodeo",
+      "tier": "must-have",
+      "mode": "standalone-userscript",
+      "status": "needs-upload",
+      "backupName": "Rodeo Bin -> Pod Floor Manual Scanner SIMPLE v1.1.user.js",
+      "description": "Manual C4/C15 bin-to-pod floor mismatch scanner. This is a must-have work tool.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "Rodeo NCL1", "url": "https://rodeo-dub.amazon.com/NCL1/" }
+      ],
+      "tags": ["rodeo", "floor", "c4", "c15"]
+    },
+    {
+      "id": "c15-hero-hotpick",
+      "name": "C15 Hero Hotpick",
+      "category": "Rodeo",
+      "tier": "must-have",
+      "mode": "standalone-userscript",
+      "status": "needs-upload",
+      "backupName": "Rodeo C15 Hero SR Hotpick Mini Column v2.0 DETAILS API.user.js",
+      "description": "C15 Hero details/helper script for hotpick and related Rodeo visibility.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "Rodeo ItemList", "url": "https://rodeo-dub.amazon.com/NCL1/ItemList" }
+      ],
+      "tags": ["rodeo", "c15", "hero", "hotpick"]
+    },
+    {
+      "id": "spp-jam-recovery",
+      "name": "SPP Jam Recovery",
+      "category": "POPS",
+      "tier": "must-have",
+      "mode": "standalone-userscript",
+      "status": "external-local",
+      "backupName": "ncl1_spp_jam_recovery_tool_v1_4_printmon.txt",
+      "description": "SPP jam recovery / SP00 workflow helper. Use as standalone until fully module-converted.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "POPS", "url": "https://aft-pops.eu.aft.amazonoperations.app/" },
+        { "label": "Rodeo NCL1", "url": "https://rodeo-dub.amazon.com/NCL1/" },
+        { "label": "PrintMon", "url": "http://localhost:5965/barcodegenerator" }
+      ],
+      "tags": ["pops", "spp", "sp00", "printmon"]
+    },
+    {
+      "id": "fcresearch-pod-details",
+      "name": "FCResearch Pod Details",
+      "category": "FCResearch",
+      "tier": "must-have",
+      "mode": "standalone-userscript",
+      "status": "needs-upload",
+      "backupName": "show pod details in FCResearch.user.js",
+      "description": "Shows pod/bin details in FCResearch. Useful base for inventory and floor investigations.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "QI FCResearch NCL1", "url": "https://qi-fcresearch-eu.corp.amazon.com/NCL1/results?s=" }
+      ],
+      "tags": ["fcresearch", "pod", "bin"]
+    },
+    {
+      "id": "fcresearch-print",
+      "name": "FCResearch Print",
+      "category": "FCResearch",
+      "tier": "optional",
+      "mode": "standalone-userscript",
+      "status": "needs-upload",
+      "backupName": "FC Research Print EU - QIFCR Fixed.user.js",
+      "description": "FCResearch print helper. Keep optional until we confirm current PrintMon path.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "QI FCResearch NCL1", "url": "https://qi-fcresearch-eu.corp.amazon.com/NCL1/results?s=" }
+      ],
+      "tags": ["fcresearch", "print"]
+    },
+    {
+      "id": "hero-master",
+      "name": "Hero Master",
+      "category": "Hero",
+      "tier": "must-have",
+      "mode": "standalone-userscript",
+      "status": "needs-upload",
+      "backupName": "NCL1 Hero Master - Top Layout Final + Collapse.user.js",
+      "description": "Hero layout/tooltips/helper panel. Known useful but needs false-positive review.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "Hero EU", "url": "https://hero.eu.picking.aft.a2z.com/" }
+      ],
+      "tags": ["hero", "age", "hazmat"]
+    },
+    {
+      "id": "elite-scout-hazmat",
+      "name": "Elite Scout Hazmat / ATROPS",
+      "category": "Rodeo",
+      "tier": "optional",
+      "mode": "standalone-userscript",
+      "status": "needs-review",
+      "backupName": "NCL1 Elite Scout - Hazmat & ATROPS.user.js",
+      "description": "Hazmat and ATROPS helper. Needs review before becoming must-have.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "Rodeo NCL1", "url": "https://rodeo-dub.amazon.com/NCL1/" }
+      ],
+      "tags": ["rodeo", "hazmat", "atrops"]
+    },
+    {
+      "id": "pops-tote-pickup",
+      "name": "POPS Tote Pickup",
+      "category": "POPS",
+      "tier": "optional",
+      "mode": "standalone-userscript",
+      "status": "needs-review",
+      "backupName": "NCL1 POPS - Tote Pickup + Collection Popup.user.js",
+      "description": "POPS tote pickup / collection popup helper. Candidate for later module conversion.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "POPS", "url": "https://aft-pops.eu.aft.amazonoperations.app/" }
+      ],
+      "tags": ["pops", "tote", "collection"]
+    },
+    {
+      "id": "printmon-helper",
+      "name": "PrintMon Helper",
+      "category": "Utilities",
+      "tier": "must-have",
+      "mode": "standalone-userscript",
+      "status": "needs-upload",
+      "backupName": "PrintMon Helper.user.js",
+      "description": "Local PrintMon helper. This stays separate because it targets localhost.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "PrintMon Local", "url": "http://localhost:5965/barcodegenerator" }
+      ],
+      "tags": ["print", "localhost"]
+    },
+    {
+      "id": "fclm-intradays",
+      "name": "FCLM Intradays",
+      "category": "Utilities",
+      "tier": "optional",
+      "mode": "standalone-userscript",
+      "status": "needs-review",
+      "backupName": "FCLM Intradays.user.js",
+      "description": "FCLM intraday helper. Optional utility.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "FCLM", "url": "https://fclm-portal.amazon.com/" }
+      ],
+      "tags": ["fclm"]
+    },
+    {
+      "id": "iol-helper",
+      "name": "IOL Helper",
+      "category": "FCResearch",
+      "tier": "optional",
+      "mode": "standalone-userscript",
+      "status": "needs-review",
+      "backupName": "haljackg's IOL Script.user.js",
+      "description": "Inventory-in-odd-location helper. Review carefully before any automation work.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "QI FCResearch NCL1", "url": "https://qi-fcresearch-eu.corp.amazon.com/NCL1/results?s=" }
+      ],
+      "tags": ["iol", "fcresearch"]
+    },
+    {
+      "id": "grafana-ncl1",
+      "name": "NCL1 Grafana",
+      "category": "Utilities",
+      "tier": "optional",
+      "mode": "standalone-userscript",
+      "status": "needs-review",
+      "backupName": "NCL1 Grafana.user.js",
+      "description": "Grafana/Serenity helper. Optional visibility tool.",
+      "installUrl": null,
+      "launchUrls": [],
+      "tags": ["grafana", "serenity"]
+    }
+  ]
+}
