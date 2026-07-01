@@ -5,8 +5,9 @@
 
   if (window.NovaWindowManager) return;
 
-  const VERSION = '0.3.0';
+  const VERSION = '0.4.0';
   const PREFIX = 'nova.window.pos.';
+  const HANDLE_CLASS = 'nova-drag-handle';
   let scanTimer = null;
 
   function key(id) {
@@ -47,29 +48,43 @@
     panel.style.bottom = 'auto';
   }
 
-  function isInteractive(target) {
-    return Boolean(target && target.closest && target.closest('button,input,textarea,select,a'));
+  function ensurePanelBase(panel) {
+    panel.style.position = 'fixed';
+    if (getComputedStyle(panel).position !== 'fixed') panel.style.position = 'fixed';
   }
 
-  function isHeaderArea(panel, event) {
-    const rect = panel.getBoundingClientRect();
-    return event.clientY >= rect.top && event.clientY <= rect.top + 46;
+  function ensureHandle(panel, id) {
+    let handle = panel.querySelector('.' + HANDLE_CLASS);
+    if (handle) return handle;
+
+    handle = document.createElement('div');
+    handle.className = HANDLE_CLASS;
+    handle.textContent = '↕ drag';
+    handle.dataset.novaWindowId = id;
+    handle.style.cssText = [
+      'position:absolute',
+      'top:8px',
+      'right:42px',
+      'z-index:2147483647',
+      'padding:3px 7px',
+      'border-radius:999px',
+      'border:1px solid rgba(255,255,255,.28)',
+      'background:rgba(0,0,0,.38)',
+      'color:#fff',
+      'font:700 10px Arial,sans-serif',
+      'line-height:1',
+      'cursor:move',
+      'user-select:none',
+      'pointer-events:auto'
+    ].join(';');
+
+    panel.appendChild(handle);
+    return handle;
   }
 
-  function makeDraggable(panel, id) {
-    if (!panel) return;
-
-    restore(panel, id);
-    panel.style.touchAction = 'none';
-
-    const header = panel.firstElementChild || panel;
-    if (header) {
-      header.style.cursor = 'move';
-      header.style.userSelect = 'none';
-    }
-
-    if (panel.__novaDragReadyStable) return;
-    panel.__novaDragReadyStable = true;
+  function attachDrag(handle, panel, id) {
+    if (!handle || handle.__novaDragAttached) return;
+    handle.__novaDragAttached = true;
 
     let active = false;
     let startX = 0;
@@ -77,15 +92,17 @@
     let startLeft = 0;
     let startTop = 0;
 
-    function down(e) {
-      if (e.button !== undefined && e.button !== 0) return;
-      if (isInteractive(e.target)) return;
-      if (!isHeaderArea(panel, e)) return;
+    function point(e) {
+      const t = e.touches && e.touches[0] ? e.touches[0] : e;
+      return { x: t.clientX, y: t.clientY };
+    }
 
+    function down(e) {
+      const p = point(e);
       const rect = panel.getBoundingClientRect();
       active = true;
-      startX = e.clientX;
-      startY = e.clientY;
+      startX = p.x;
+      startY = p.y;
       startLeft = rect.left;
       startTop = rect.top;
 
@@ -94,22 +111,27 @@
       panel.style.right = 'auto';
       panel.style.bottom = 'auto';
 
-      document.addEventListener('pointermove', move, true);
-      document.addEventListener('pointerup', up, true);
+      document.addEventListener('mousemove', move, true);
+      document.addEventListener('mouseup', up, true);
+      document.addEventListener('touchmove', move, true);
+      document.addEventListener('touchend', up, true);
       e.preventDefault();
+      e.stopPropagation();
     }
 
     function move(e) {
       if (!active) return;
+      const p = point(e);
       const rect = panel.getBoundingClientRect();
       const maxX = Math.max(4, window.innerWidth - rect.width - 4);
       const maxY = Math.max(4, window.innerHeight - rect.height - 4);
-      const x = clamp(startLeft + e.clientX - startX, 4, maxX);
-      const y = clamp(startTop + e.clientY - startY, 4, maxY);
+      const x = clamp(startLeft + p.x - startX, 4, maxX);
+      const y = clamp(startTop + p.y - startY, 4, maxY);
       panel.style.left = x + 'px';
       panel.style.top = y + 'px';
       panel.style.right = 'auto';
       panel.style.bottom = 'auto';
+      e.preventDefault();
     }
 
     function up() {
@@ -117,11 +139,22 @@
       active = false;
       const rect = panel.getBoundingClientRect();
       savePos(id, { x: Math.round(rect.left), y: Math.round(rect.top) });
-      document.removeEventListener('pointermove', move, true);
-      document.removeEventListener('pointerup', up, true);
+      document.removeEventListener('mousemove', move, true);
+      document.removeEventListener('mouseup', up, true);
+      document.removeEventListener('touchmove', move, true);
+      document.removeEventListener('touchend', up, true);
     }
 
-    panel.addEventListener('pointerdown', down, true);
+    handle.addEventListener('mousedown', down, true);
+    handle.addEventListener('touchstart', down, true);
+  }
+
+  function makeDraggable(panel, id) {
+    if (!panel) return;
+    ensurePanelBase(panel);
+    restore(panel, id);
+    const handle = ensureHandle(panel, id);
+    attachDrag(handle, panel, id);
   }
 
   function scan() {
@@ -131,7 +164,7 @@
 
   function start() {
     scan();
-    if (!scanTimer) scanTimer = setInterval(scan, 5000);
+    if (!scanTimer) scanTimer = setInterval(scan, 500);
   }
 
   window.NovaWindowManager = {
