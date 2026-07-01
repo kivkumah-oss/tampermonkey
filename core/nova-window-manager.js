@@ -5,8 +5,9 @@
 
   if (window.NovaWindowManager) return;
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
   const PREFIX = 'nova.window.pos.';
+  let scanTimer = null;
 
   function key(id) {
     return PREFIX + id;
@@ -34,23 +35,31 @@
   function restore(panel, id) {
     const pos = readPos(id);
     if (!pos) return;
+
     const w = panel.offsetWidth || 360;
     const h = panel.offsetHeight || 360;
-    panel.style.left = clamp(pos.x, 4, window.innerWidth - w - 4) + 'px';
-    panel.style.top = clamp(pos.y, 4, window.innerHeight - h - 4) + 'px';
+    const maxX = Math.max(4, window.innerWidth - w - 4);
+    const maxY = Math.max(4, window.innerHeight - h - 4);
+
+    panel.style.left = clamp(pos.x || 16, 4, maxX) + 'px';
+    panel.style.top = clamp(pos.y || 64, 4, maxY) + 'px';
     panel.style.right = 'auto';
     panel.style.bottom = 'auto';
   }
 
   function makeDraggable(panel, id) {
-    if (!panel || panel.__novaDragReady) return;
-    panel.__novaDragReady = true;
+    if (!panel) return;
 
     const handle = panel.firstElementChild || panel;
-    handle.style.cursor = 'move';
-    handle.style.userSelect = 'none';
+    if (!handle) return;
 
     restore(panel, id);
+
+    if (panel.__novaDragHandle === handle) return;
+    panel.__novaDragHandle = handle;
+
+    handle.style.cursor = 'move';
+    handle.style.userSelect = 'none';
 
     let active = false;
     let startX = 0;
@@ -82,8 +91,10 @@
     function move(e) {
       if (!active) return;
       const rect = panel.getBoundingClientRect();
-      const x = clamp(startLeft + e.clientX - startX, 4, window.innerWidth - rect.width - 4);
-      const y = clamp(startTop + e.clientY - startY, 4, window.innerHeight - rect.height - 4);
+      const maxX = Math.max(4, window.innerWidth - rect.width - 4);
+      const maxY = Math.max(4, window.innerHeight - rect.height - 4);
+      const x = clamp(startLeft + e.clientX - startX, 4, maxX);
+      const y = clamp(startTop + e.clientY - startY, 4, maxY);
       panel.style.left = x + 'px';
       panel.style.top = y + 'px';
       panel.style.right = 'auto';
@@ -107,6 +118,11 @@
     makeDraggable(document.getElementById('nova-memory-panel'), 'nova-memory-panel');
   }
 
+  function start() {
+    scan();
+    if (!scanTimer) scanTimer = setInterval(scan, 3000);
+  }
+
   window.NovaWindowManager = {
     version: VERSION,
     scan,
@@ -117,8 +133,7 @@
     }
   };
 
-  setInterval(scan, 1000);
-  scan();
+  start();
 
   console.log('[Nova Core] NovaWindowManager loaded');
 })();
