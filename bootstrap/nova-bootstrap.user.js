@@ -1,23 +1,23 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      1.4.1
+// @version      1.4.2
 // @description  Nova Core bootstrap loader
 // @author       Nova
 // @match        *://*/*
 // @grant        none
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js?v=141
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js?v=141
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory.js?v=141
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js?v=141
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js?v=141
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js?v=141
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js?v=141
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js?v=141
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js?v=141
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js?v=141
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js?v=141
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js?v=141
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js?v=142
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js?v=142
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory.js?v=142
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js?v=142
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js?v=142
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js?v=142
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js?v=142
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js?v=142
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js?v=142
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js?v=142
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js?v=142
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js?v=142
 // ==/UserScript==
 
 (function () {
@@ -26,8 +26,8 @@
   const REGISTRY_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/modules.registry.json';
 
   window.Nova = window.Nova || {};
-  window.Nova.version = '1.4.1';
-  window.Nova.build = 'mission-026-ui-reset-cachefix';
+  window.Nova.version = '1.4.2';
+  window.Nova.build = 'mission-026-ui-correction';
   window.Nova.loadedAt = new Date().toISOString();
   window.Nova.registryUrl = REGISTRY_URL;
   window.Nova.registry = null;
@@ -52,30 +52,22 @@
     try {
       const response = await fetch(REGISTRY_URL + '?ts=' + Date.now(), { cache: 'no-store' });
       if (!response.ok) throw new Error('Registry HTTP ' + response.status);
-
       const registry = await response.json();
       window.Nova.registry = registry;
       window.Nova.modulesRegistry = Array.isArray(registry.modules) ? registry.modules : [];
-
       console.log('[Nova Core] Module registry loaded', window.Nova.modulesRegistry.length, 'modules');
-
       if (window.NovaMenu && typeof window.NovaMenu.refresh === 'function') window.NovaMenu.refresh();
       if (window.NovaMemoryPanel && typeof window.NovaMemoryPanel.refresh === 'function') window.NovaMemoryPanel.refresh();
       if (window.NovaWindowManager && typeof window.NovaWindowManager.scan === 'function') window.NovaWindowManager.scan();
       if (window.NovaModuleLoader && typeof window.NovaModuleLoader.loadMatching === 'function') window.NovaModuleLoader.loadMatching();
-
       if (window.NovaSession && window.NovaSession.isActive()) {
         window.NovaSession.addEvent({
           module: 'bootstrap',
           type: 'registry-load',
           summary: 'Nova module registry loaded',
-          data: {
-            count: window.Nova.modulesRegistry.length,
-            registryVersion: registry.version || null
-          }
+          data: { count: window.Nova.modulesRegistry.length, registryVersion: registry.version || null }
         });
       }
-
       return registry;
     } catch (error) {
       console.warn('[Nova Core] Failed to load module registry', error);
@@ -86,12 +78,8 @@
   }
 
   window.Nova.loadRegistry = loadRegistry;
-  window.Nova.getModules = function getModules() {
-    return window.Nova.modulesRegistry.slice();
-  };
-  window.Nova.getEnabledModules = function getEnabledModules() {
-    return window.Nova.modulesRegistry.filter((module) => module && module.enabled !== false);
-  };
+  window.Nova.getModules = function getModules() { return window.Nova.modulesRegistry.slice(); };
+  window.Nova.getEnabledModules = function getEnabledModules() { return window.Nova.modulesRegistry.filter((module) => module && module.enabled !== false); };
 
   function logStatus() {
     console.group('[Nova Core] Bootstrap loaded');
@@ -114,16 +102,9 @@
   }
 
   if (window.NovaTheme && typeof window.NovaTheme.inject === 'function') window.NovaTheme.inject();
-
   if (window.NovaSession && window.NovaSession.isActive()) {
-    window.NovaSession.addEvent({
-      module: 'bootstrap',
-      type: 'load',
-      summary: 'Nova Bootstrap loaded',
-      data: { version: window.Nova.version, pageUrl: location.href }
-    });
+    window.NovaSession.addEvent({ module: 'bootstrap', type: 'load', summary: 'Nova Bootstrap loaded', data: { version: window.Nova.version, pageUrl: location.href } });
   }
-
   loadRegistry();
   logStatus();
 })();
