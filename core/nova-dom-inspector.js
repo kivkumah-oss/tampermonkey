@@ -15,6 +15,24 @@
     return new Date().toISOString();
   }
 
+  function writeClipboard(text) {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      return navigator.clipboard.writeText(text);
+    }
+
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', 'readonly');
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    area.style.top = '-9999px';
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand('copy');
+    area.remove();
+    return Promise.resolve();
+  }
+
   function cleanText(value) {
     return String(value || '')
       .replace(/\s+/g, ' ')
@@ -94,7 +112,7 @@
     const includeElements = options.includeElements !== false;
     const snapshot = {
       tool: 'Nova DOM Inspector',
-      version: '0.1.0',
+      version: '0.2.0-devkit-copy-restore',
       capturedAt: now(),
       page: {
         url: location.href,
@@ -151,13 +169,28 @@
     return snapshot;
   }
 
+  function copy(options = {}) {
+    const snapshot = inspect(options);
+    writeClipboard(JSON.stringify(snapshot, null, 2)).then(() => {
+      console.log('[Nova DOM Inspector] Copied', options.includeElements === false ? 'summary' : 'full snapshot');
+    }).catch((error) => {
+      console.warn('[Nova DOM Inspector] Clipboard copy failed', error);
+    });
+    return snapshot;
+  }
+
   window.NovaDOMInspector = {
     inspect,
-    copy(options = {}) {
-      const snapshot = inspect(options);
-      navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2));
-      return snapshot;
+    copy,
+
+    copySummary() {
+      return copy({ includeElements: false });
     },
+
+    copyFull() {
+      return copy({ includeElements: true });
+    },
+
     summary() {
       return inspect({ includeElements: false });
     }
