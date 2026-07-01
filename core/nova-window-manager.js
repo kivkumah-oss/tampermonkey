@@ -5,7 +5,7 @@
 
   if (window.NovaWindowManager) return;
 
-  const VERSION = '0.2.0';
+  const VERSION = '0.3.0';
   const PREFIX = 'nova.window.pos.';
   let scanTimer = null;
 
@@ -47,19 +47,29 @@
     panel.style.bottom = 'auto';
   }
 
+  function isInteractive(target) {
+    return Boolean(target && target.closest && target.closest('button,input,textarea,select,a'));
+  }
+
+  function isHeaderArea(panel, event) {
+    const rect = panel.getBoundingClientRect();
+    return event.clientY >= rect.top && event.clientY <= rect.top + 46;
+  }
+
   function makeDraggable(panel, id) {
     if (!panel) return;
 
-    const handle = panel.firstElementChild || panel;
-    if (!handle) return;
-
     restore(panel, id);
+    panel.style.touchAction = 'none';
 
-    if (panel.__novaDragHandle === handle) return;
-    panel.__novaDragHandle = handle;
+    const header = panel.firstElementChild || panel;
+    if (header) {
+      header.style.cursor = 'move';
+      header.style.userSelect = 'none';
+    }
 
-    handle.style.cursor = 'move';
-    handle.style.userSelect = 'none';
+    if (panel.__novaDragReadyStable) return;
+    panel.__novaDragReadyStable = true;
 
     let active = false;
     let startX = 0;
@@ -69,7 +79,8 @@
 
     function down(e) {
       if (e.button !== undefined && e.button !== 0) return;
-      if (e.target && e.target.closest && e.target.closest('button,input,textarea,select,a')) return;
+      if (isInteractive(e.target)) return;
+      if (!isHeaderArea(panel, e)) return;
 
       const rect = panel.getBoundingClientRect();
       active = true;
@@ -110,7 +121,7 @@
       document.removeEventListener('pointerup', up, true);
     }
 
-    handle.addEventListener('pointerdown', down, true);
+    panel.addEventListener('pointerdown', down, true);
   }
 
   function scan() {
@@ -120,7 +131,7 @@
 
   function start() {
     scan();
-    if (!scanTimer) scanTimer = setInterval(scan, 3000);
+    if (!scanTimer) scanTimer = setInterval(scan, 5000);
   }
 
   window.NovaWindowManager = {
