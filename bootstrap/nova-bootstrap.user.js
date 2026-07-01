@@ -1,23 +1,23 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      1.4.3
+// @version      1.4.4
 // @description  Nova Core bootstrap loader
 // @author       Nova
 // @match        *://*/*
 // @grant        none
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js?v=143
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js?v=143
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory.js?v=143
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js?v=143
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js?v=143
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js?v=143
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js?v=143
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js?v=143
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js?v=143
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js?v=143
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js?v=143
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js?v=143
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js?v=144
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js?v=144
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory.js?v=144
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js?v=144
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js?v=144
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js?v=144
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js?v=144
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js?v=144
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js?v=144
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js?v=144
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js?v=144
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js?v=144
 // ==/UserScript==
 
 (function () {
@@ -26,8 +26,8 @@
   const REGISTRY_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/modules.registry.json';
 
   window.Nova = window.Nova || {};
-  window.Nova.version = '1.4.3';
-  window.Nova.build = 'mission-026-theme-restore';
+  window.Nova.version = '1.4.4';
+  window.Nova.build = 'mission-027-theme-picker-rgb';
   window.Nova.loadedAt = new Date().toISOString();
   window.Nova.registryUrl = REGISTRY_URL;
   window.Nova.registry = null;
