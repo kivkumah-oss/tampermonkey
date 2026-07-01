@@ -5,7 +5,7 @@
 
   if (window.NovaModuleLoader) return;
 
-  const VERSION = '0.2.0';
+  const VERSION = '0.3.0';
   const loaded = new Set();
 
   function matchOne(pattern) {
@@ -33,32 +33,35 @@
     return true;
   }
 
-  function loadScript(module) {
+  async function loadScript(module) {
     if (!canLoad(module)) return false;
     if (loaded.has(module.id)) return true;
 
-    const script = document.createElement('script');
-    script.src = module.url + (module.url.includes('?') ? '&' : '?') + 'ts=' + Date.now();
-    script.async = false;
-    script.dataset.novaModuleId = module.id;
-    script.onload = () => {
+    try {
+      const url = module.url + (module.url.includes('?') ? '&' : '?') + 'ts=' + Date.now();
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const code = await response.text();
+      const runner = new Function(code + '\n//# sourceURL=' + module.id + '.js');
+      runner();
       loaded.add(module.id);
       console.log('[Nova Module Loader] Loaded', module.id);
       emit('module-loaded', 'Nova module loaded: ' + module.id, { id: module.id, url: module.url });
-    };
-    script.onerror = () => {
-      console.warn('[Nova Module Loader] Failed', module.id);
-      emit('module-load-error', 'Nova module failed: ' + module.id, { id: module.id, url: module.url });
-    };
-    document.head.appendChild(script);
-    return true;
+      return true;
+    } catch (error) {
+      console.warn('[Nova Module Loader] Failed', module.id, error);
+      emit('module-load-error', 'Nova module failed: ' + module.id, { id: module.id, url: module.url, error: String(error) });
+      return false;
+    }
   }
 
   function loadMatching() {
     const modules = window.Nova && Array.isArray(window.Nova.modulesRegistry) ? window.Nova.modulesRegistry : [];
     let count = 0;
     modules.forEach((module) => {
-      if (module.autoload === true && loadScript(module)) count += 1;
+      if (module.autoload === true) {
+        loadScript(module).then((ok) => { if (ok) count += 1; });
+      }
     });
     return count;
   }
