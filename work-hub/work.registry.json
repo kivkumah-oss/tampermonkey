@@ -1,7 +1,7 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "updatedAt": "2026-07-01",
-  "notes": "Phase 1 catalog only. Install URLs are intentionally blank until scripts are reviewed and moved to a safe/private module source.",
+  "notes": "Phase 1 catalog. Floor Mismatch is wired as a public-test installer; keep sensitive/private tools blank until reviewed.",
   "tools": [
     {
       "id": "new-rodeo",
@@ -25,10 +25,10 @@
       "category": "Rodeo",
       "tier": "must-have",
       "mode": "standalone-userscript",
-      "status": "needs-upload",
+      "status": "public-test",
       "backupName": "Rodeo Bin -> Pod Floor Manual Scanner SIMPLE v1.1.user.js",
-      "description": "Manual C4/C15 bin-to-pod floor mismatch scanner. This is a must-have work tool.",
-      "installUrl": null,
+      "description": "Manual C4/C15 bin-to-pod floor mismatch scanner. Public test installer based on the working v1.1 flow.",
+      "installUrl": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/work-scripts/rodeo/floor-mismatch.user.js",
       "launchUrls": [
         { "label": "Rodeo NCL1", "url": "https://rodeo-dub.amazon.com/NCL1/" }
       ],
@@ -195,8 +195,8 @@
       "status": "needs-review",
       "backupName": "NCL1 Grafana.user.js",
       "description": "Grafana/Serenity helper. Optional visibility tool.",
-      "installUrl": null,
       "launchUrls": [],
+      "installUrl": null,
       "tags": ["grafana", "serenity"]
     }
   ]
