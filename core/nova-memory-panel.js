@@ -8,12 +8,10 @@
     return;
   }
 
-  const BUTTON_ID = 'nova-memory-button';
   const PANEL_ID = 'nova-memory-panel';
 
   const state = {
     open: false,
-    button: null,
     panel: null
   };
 
@@ -48,34 +46,6 @@
     });
   }
 
-  function createButton() {
-    if (state.button) return state.button;
-
-    const button = document.createElement('button');
-    button.id = BUTTON_ID;
-    button.textContent = 'Memory';
-    button.title = 'Open Nova Memory';
-    button.style.cssText = [
-      'position:fixed',
-      'right:82px',
-      'bottom:16px',
-      'z-index:2147483646',
-      'padding:10px 14px',
-      'border-radius:999px',
-      'border:1px solid rgba(240,171,252,.55)',
-      'background:rgba(10,10,18,.96)',
-      'color:#fff',
-      'font:700 13px Arial,sans-serif',
-      'box-shadow:0 0 18px rgba(240,171,252,.35)',
-      'cursor:pointer'
-    ].join(';');
-
-    button.addEventListener('click', () => window.NovaMemoryPanel.toggle());
-    document.body.appendChild(button);
-    state.button = button;
-    return button;
-  }
-
   function createPanel() {
     if (state.panel) return state.panel;
 
@@ -105,16 +75,7 @@
 
   function getSummary() {
     if (!window.NovaMemory || typeof window.NovaMemory.summary !== 'function') {
-      return {
-        host: location.hostname,
-        visits: 0,
-        pages: 0,
-        notes: 0,
-        selectors: 0,
-        endpoints: 0,
-        modules: 0,
-        findings: 0
-      };
+      return { host: location.hostname, visits: 0, pages: 0, notes: 0, selectors: 0, endpoints: 0, modules: 0, findings: 0 };
     }
     return window.NovaMemory.summary();
   }
@@ -231,7 +192,6 @@
 
   window.NovaMemoryPanel = {
     show() {
-      createButton();
       render();
       state.panel.style.display = 'block';
       state.open = true;
@@ -247,10 +207,9 @@
       else this.show();
     },
     refresh() {
-      render();
+      if (state.open) render();
     },
     init() {
-      createButton();
       console.log('[Nova Core] NovaMemoryPanel initialized');
     }
   };
