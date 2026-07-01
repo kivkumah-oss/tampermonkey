@@ -20,6 +20,24 @@
     }
   }
 
+  function writeClipboard(text) {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      return navigator.clipboard.writeText(text);
+    }
+
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', 'readonly');
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    area.style.top = '-9999px';
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand('copy');
+    area.remove();
+    return Promise.resolve();
+  }
+
   function sessionPayload() {
     if (!window.NovaSession || typeof window.NovaSession.export !== 'function') return null;
     return safeClone(window.NovaSession.export());
@@ -51,7 +69,7 @@
   function build(options = {}) {
     const payload = {
       tool: 'Nova Investigation Export',
-      version: '0.1.0',
+      version: '0.2.0-devkit-copy-restore',
       exportedAt: now(),
       intent: 'AI-ready website investigation package',
       privacy: {
@@ -102,16 +120,33 @@
     return payload;
   }
 
+  function copy(options = {}) {
+    const payload = build(options);
+    const text = JSON.stringify(payload, null, 2);
+    writeClipboard(text).then(() => {
+      console.log('[Nova Investigation Export] Copied', options.fullDom ? 'extended bundle' : 'summary bundle');
+    }).catch((error) => {
+      console.warn('[Nova Investigation Export] Clipboard copy failed', error);
+    });
+    return payload;
+  }
+
   window.NovaInvestigationExport = {
     build,
-    copy(options = {}) {
-      const payload = build(options);
-      navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-      return payload;
+    copy,
+
+    copySummary() {
+      return copy({ fullDom: false });
     },
+
+    copyExtended() {
+      return copy({ fullDom: true });
+    },
+
     copyFull() {
-      return this.copy({ fullDom: true });
+      return copy({ fullDom: true });
     },
+
     summary() {
       const payload = build({ fullDom: false });
       return {
