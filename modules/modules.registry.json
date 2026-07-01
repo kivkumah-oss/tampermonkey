@@ -1,5 +1,5 @@
 {
-  "version": "0.9.0",
+  "version": "1.0.0",
   "updatedAt": "2026-07-01",
   "modules": [
     {
@@ -41,7 +41,7 @@
     {
       "id": "nova-memory-panel",
       "name": "Nova Memory Panel",
-      "description": "Floating controls for viewing, saving, searching, copying, and clearing local website memory.",
+      "description": "Advanced memory panel opened from Nova Advanced.",
       "type": "core",
       "enabled": true,
       "core": true,
@@ -58,8 +58,8 @@
     },
     {
       "id": "nova-menu",
-      "name": "Nova Modules Menu",
-      "description": "Floating menu for viewing Nova modules and starting or exporting sessions.",
+      "name": "Nova Menu",
+      "description": "Single movable Nova orb with Modules and Advanced views.",
       "type": "core",
       "enabled": true,
       "core": true,
@@ -71,6 +71,7 @@
       "description": "Floating Suno music controller module for play, pause, next, previous, shuffle, and lyrics experiments.",
       "type": "module",
       "enabled": true,
+      "autoload": false,
       "core": false,
       "api": "NovaSunoPlayer",
       "match": ["https://suno.com/*"],
