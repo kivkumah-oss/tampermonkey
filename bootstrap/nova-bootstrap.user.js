@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      1.3.0
+// @version      1.4.0
 // @description  Nova Core bootstrap loader
 // @author       Nova
 // @match        *://*/*
@@ -26,8 +26,8 @@
   const REGISTRY_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/modules.registry.json';
 
   window.Nova = window.Nova || {};
-  window.Nova.version = '1.3.0';
-  window.Nova.build = 'mission-025-suno-player';
+  window.Nova.version = '1.4.0';
+  window.Nova.build = 'mission-026-ui-reset';
   window.Nova.loadedAt = new Date().toISOString();
   window.Nova.registryUrl = REGISTRY_URL;
   window.Nova.registry = null;
@@ -96,6 +96,7 @@
   function logStatus() {
     console.group('[Nova Core] Bootstrap loaded');
     console.log('Version:', window.Nova.version);
+    console.log('Build:', window.Nova.build);
     console.log('Theme:', Boolean(window.NovaTheme));
     console.log('Session:', Boolean(window.NovaSession));
     console.log('Memory:', Boolean(window.NovaMemory));
@@ -119,10 +120,7 @@
       module: 'bootstrap',
       type: 'load',
       summary: 'Nova Bootstrap loaded',
-      data: {
-        version: window.Nova.version,
-        pageUrl: location.href
-      }
+      data: { version: window.Nova.version, pageUrl: location.href }
     });
   }
 
