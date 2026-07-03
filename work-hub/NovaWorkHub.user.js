@@ -37,6 +37,7 @@
     open: false,
     registry: null,
     tools: [],
+    modules: {},
     prefs: readPrefs(),
     ui: readUi(),
     loading: false,
@@ -390,9 +391,23 @@
       page: location.href,
       registryVersion: state.registry ? state.registry.version : null,
       prefs: state.prefs,
+      registeredModules: Object.keys(state.modules),
       visibleTools: filteredTools().map((tool) => ({ id: tool.id, name: tool.name, tier: tool.tier, category: tool.category, status: tool.status, installReady: Boolean(tool.installUrl) }))
     };
     copyText(JSON.stringify(payload, null, 2)).then(() => alert('Nova Work Hub state copied.')).catch(() => alert('Copy failed.'));
+  }
+
+  function registerModule(id, api) {
+    const moduleId = String(id || (api && api.id) || '').trim();
+    if (!moduleId) return false;
+    state.modules[moduleId] = Object.assign({}, api || {}, { id: moduleId, registeredAt: new Date().toISOString() });
+    render();
+    return true;
+  }
+
+  function allowModule(id) {
+    const tool = findTool(id);
+    return tool ? toolEnabled(tool) : true;
   }
 
   function show() {
@@ -418,7 +433,18 @@
     console.log('[Nova Work Hub] loaded');
   }
 
-  window.NovaWorkHub = { version: VERSION, show, hide, toggle, reload: loadRegistry };
+  window.NovaWorkHub = {
+    name: 'NovaWorkHub',
+    version: VERSION,
+    modules: state.modules,
+    show,
+    hide,
+    toggle,
+    reload: loadRegistry,
+    registerModule,
+    allowModule
+  };
+  window.NovaCore = window.NovaCore || window.NovaWorkHub;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init, { once: true });

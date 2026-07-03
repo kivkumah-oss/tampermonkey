@@ -172,6 +172,22 @@
       "tags": ["fclm"]
     },
     {
+      "id": "suno-remote",
+      "name": "Nova Suno Remote",
+      "category": "Personal",
+      "tier": "optional",
+      "mode": "bootstrap-aware-userscript",
+      "status": "local-dev",
+      "backupName": "Nova_Suno_Remote_Any_Page_v0_1.user.js",
+      "description": "Personal Suno remote player with Prime capture, lyrics reader, RGB Lab, cross-tab audio lock, and movable icon. Runs standalone today and registers with NovaCore when Bootstrap is present.",
+      "installUrl": null,
+      "launchUrls": [
+        { "label": "Google Test Page", "url": "https://www.google.com/" },
+        { "label": "Suno Library", "url": "https://suno.com/me" }
+      ],
+      "tags": ["personal", "suno", "music", "rgb", "bootstrap-aware"]
+    },
+    {
       "id": "iol-helper",
       "name": "IOL Helper",
       "category": "FCResearch",

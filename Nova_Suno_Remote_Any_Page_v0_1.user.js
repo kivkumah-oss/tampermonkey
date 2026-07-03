@@ -1,15 +1,16 @@
 // ==UserScript==
 // @name         Nova Suno Remote - Any Page v0.1
 // @namespace    nova.suno.remote.anypage
-// @version      0.1.9
-// @description  Experimental read-only Suno remote: load your Suno library/feed with GM access or a safe Suno prime window, then play from any page.
-// @author       kivkumah + Nova + Cody
+// @version      0.1.14
+// @description  Pocket Gremlin Edition: read-only Suno remote with full-library prime capture, lyrics reader, RGB Lab, and audio-reactive playback UI.
+// @author       Cody / Codex + kivkumah + Nova
 // @match        *://*/*
 // @include      /^https?:\/\/.*/
 // @run-at       document-start
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_addValueChangeListener
 // @grant        GM_registerMenuCommand
 // @grant        unsafeWindow
 // @connect      studio-api-prod.suno.com
@@ -20,13 +21,22 @@
 // @connect      cdn-o.suno.com
 // ==/UserScript==
 
+// Nova Suno Remote - Pocket Gremlin Edition
+// Lead build: Cody / Codex
+// Product brain, testing, workflow direction: kivkumah
+// Co-architect and earlier groundwork: Nova
+//
+// This is a read-only personal-library remote. It does not store Suno auth
+// headers, cookies, passwords, or tokens. Prime capture lets Suno authenticate
+// itself normally, then saves song metadata/audio URLs locally in Tampermonkey.
+
 (function () {
   'use strict';
 
   if (window.top !== window.self) return;
   if (window.NovaSunoRemoteAnyPage) return;
 
-  const VERSION = '0.1.9';
+  const VERSION = '0.1.14';
   const API = 'https://studio-api-prod.suno.com';
   const IS_SUNO = location.hostname === 'suno.com' || location.hostname.endsWith('.suno.com');
   const PRIME_PARAM = 'nova_suno_prime';
@@ -40,13 +50,16 @@
     feedRecipes: 'nova_suno_remote_feed_recipes_v1',
     lastPrimeAt: 'nova_suno_remote_last_prime_at_v1',
     primeStatus: 'nova_suno_remote_prime_status_v1',
+    playOwner: 'nova_suno_remote_play_owner_v1',
     panelPos: 'nova_suno_remote_panel_pos_v1',
+    orbPos: 'nova_suno_remote_orb_pos_v1',
     lyricsPos: 'nova_suno_remote_lyrics_pos_v1',
     fxPos: 'nova_suno_remote_fx_pos_v1',
     minimized: 'nova_suno_remote_minimized_v1',
     theme: 'nova_suno_remote_theme_v1',
     fxSettings: 'nova_suno_remote_fx_settings_v1'
   };
+  const TAB_ID = `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   const FX_DEFAULTS = {
     enabled: true,
@@ -112,9 +125,13 @@
     fxSettings: readFxSettings(),
     dragging: null,
     directLastError: '',
+    lastAudioError: '',
+    lastPlayDebug: null,
     currentClipId: '',
     audioFx: null,
     audioFxRun: 0,
+    bootstrap: { registered: false, host: '' },
+    suppressOrbClick: false,
     blobUrls: new Map(),
     blobLoading: new Set()
   };
@@ -128,6 +145,8 @@
   let primeFullNoMore = false;
   let primeHud = null;
   let bootTimer = null;
+  let bootstrapTimer = null;
+  let bootstrapAttempts = 0;
   let survivalTimer = null;
   let survivalObserver = null;
   let observedBody = null;
@@ -135,6 +154,7 @@
   let bootAttempts = 0;
 
   console.info(`[Nova Suno Remote] loaded v${VERSION} on ${location.href}`);
+  setupCrossTabAudioLock();
 
   function clean(value) {
     return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
@@ -160,6 +180,40 @@
 
   function writeJson(key, value) {
     GM_setValue(key, JSON.stringify(value));
+  }
+
+  function setupCrossTabAudioLock() {
+    if (typeof GM_addValueChangeListener !== 'function') return;
+    GM_addValueChangeListener(STORAGE.playOwner, (_name, _oldValue, newValue) => {
+      const owner = parseJsonValue(newValue, null);
+      if (!owner || owner.tabId === TAB_ID) return;
+      const audio = state.audio;
+      if (!audio || audio.paused) return;
+
+      audio.pause();
+      setStatusOnly(`Paused: ${owner.title || 'another Nova tab'} is playing in another tab.`);
+      updatePlaybackUi();
+    });
+  }
+
+  function claimAudioOwnership(clip) {
+    if (!clip) return;
+    writeJson(STORAGE.playOwner, {
+      tabId: TAB_ID,
+      clipId: clip.id || '',
+      title: clip.title || '',
+      page: location.href,
+      at: Date.now()
+    });
+  }
+
+  function parseJsonValue(value, fallback) {
+    try {
+      if (!value) return fallback;
+      return typeof value === 'string' ? JSON.parse(value) : value;
+    } catch (_) {
+      return fallback;
+    }
   }
 
   function readFxSettings() {
@@ -283,6 +337,11 @@
   function setStatus(text) {
     state.status = text;
     render();
+  }
+
+  function setStatusOnly(text) {
+    state.status = text;
+    updateStatusUi();
   }
 
   function applyFilter() {
@@ -591,11 +650,18 @@
   function ensureAudio() {
     if (state.audio) return state.audio;
     const audio = new Audio();
-    audio.preload = 'metadata';
+    audio.preload = 'auto';
+    audio.volume = 1;
+    audio.muted = false;
     audio.addEventListener('ended', () => playNext());
     audio.addEventListener('timeupdate', () => throttleRender());
+    audio.addEventListener('canplay', () => updatePlaybackUi());
     audio.addEventListener('loadedmetadata', () => render());
     audio.addEventListener('play', () => {
+      audio.volume = 1;
+      audio.muted = false;
+      state.lastAudioError = '';
+      claimAudioOwnership(currentClip());
       startAudioReactive();
       render();
     });
@@ -605,11 +671,12 @@
     });
     audio.addEventListener('error', () => {
       const clip = currentClip();
+      state.lastAudioError = `Audio element error${audio.error ? ` code ${audio.error.code}` : ''}`;
       if (clip && clip.id && audio.src && !audio.src.startsWith('blob:') && !state.blobLoading.has(clip.id)) {
         playViaBlob(clip, 'Direct audio failed. Trying GM blob fallback...');
         return;
       }
-      setStatus(`Audio failed${audio.error ? ` (${audio.error.code})` : ''}. The saved Suno audio URL may be blocked or expired.`);
+      setStatus(`${state.lastAudioError}. The saved Suno audio URL may be blocked or expired.`);
     });
     state.audio = audio;
     return audio;
@@ -632,7 +699,24 @@
 
     const clip = list[state.index];
     state.currentClipId = clip.id || '';
+    state.lastAudioError = '';
+    state.lastPlayDebug = makePlayDebug(clip, 'selected');
+
+    const blobOk = await playViaBlob(clip, `Loading audio: ${clip.title}`);
+    if (blobOk) return;
+    await playDirect(clip, 'Blob path failed. Trying direct audio URL...');
+  }
+
+  async function playDirect(clip, message) {
+    if (!clip || !clip.audioUrl) {
+      setStatus('No playable saved audio URL for this song.');
+      return false;
+    }
     const audio = ensureAudio();
+    audio.volume = 1;
+    audio.muted = false;
+    state.lastPlayDebug = makePlayDebug(clip, 'direct');
+    if (message) setStatusOnly(message);
     if (audio.src !== clip.audioUrl) {
       audio.src = clip.audioUrl;
       audio.load();
@@ -640,45 +724,72 @@
 
     try {
       await audio.play();
-      setStatus(`Playing: ${clip.title}`);
+      state.lastAudioError = '';
+      setStatusOnly(`Playing: ${clip.title}`);
+      updatePlaybackUi();
+      return true;
     } catch (error) {
-      await playViaBlob(clip, `Play blocked: ${error && error.message ? error.message : String(error)}. Trying GM blob fallback...`);
+      const messageText = error && error.message ? error.message : String(error);
+      state.directLastError = messageText;
+      state.lastAudioError = `Direct play failed: ${messageText}`;
+      setStatusOnly(state.lastAudioError);
+      updatePlaybackUi();
+      return false;
     }
   }
 
   async function playViaBlob(clip, message) {
     if (!clip || !clip.audioUrl || !clip.id) {
       setStatus('No playable saved audio URL for this song.');
-      return;
+      return false;
     }
     if (!isAllowedAudioUrl(clip.audioUrl)) {
       setStatus('Saved audio URL host is not allowed by Nova safety guard.');
-      return;
+      return false;
     }
-    if (state.blobLoading.has(clip.id)) return;
+    if (state.blobLoading.has(clip.id)) {
+      setStatusOnly(`Already loading: ${clip.title}`);
+      return false;
+    }
 
     state.blobLoading.add(clip.id);
-    setStatus(message || 'Fetching audio with GM blob fallback...');
-    render();
+    setStatusOnly(message || 'Fetching audio with GM blob fallback...');
 
     try {
       const audio = ensureAudio();
+      audio.volume = 1;
+      audio.muted = false;
       let blobUrl = state.blobUrls.get(clip.id);
+      const cacheHit = Boolean(blobUrl);
+      let blobSize = 0;
+      let blobType = '';
       if (!blobUrl) {
         const blob = await gmBlob(clip.audioUrl);
+        blobSize = Number(blob && blob.size) || 0;
+        blobType = clean(blob && blob.type);
         blobUrl = URL.createObjectURL(blob);
         state.blobUrls.set(clip.id, blobUrl);
       }
+      state.lastPlayDebug = makePlayDebug(clip, 'blob', {
+        blobCacheHit: cacheHit,
+        blobSize,
+        blobType
+      });
       state.currentClipId = clip.id || '';
       audio.src = blobUrl;
       audio.load();
       await audio.play();
-      setStatus(`Playing via blob fallback: ${clip.title}`);
+      state.lastAudioError = '';
+      setStatusOnly(`Playing: ${clip.title}`);
+      return true;
     } catch (error) {
-      setStatus(`Blob fallback failed: ${error && error.message ? error.message : String(error)}`);
+      const messageText = error && error.message ? error.message : String(error);
+      state.lastAudioError = `Blob playback failed: ${messageText}`;
+      setStatusOnly(state.lastAudioError);
+      return false;
     } finally {
       state.blobLoading.delete(clip.id);
-      render();
+      updatePlaybackUi();
     }
   }
 
@@ -687,11 +798,27 @@
       GM_xmlhttpRequest({
         method: 'GET',
         url,
+        anonymous: false,
+        withCredentials: true,
+        headers: {
+          Accept: 'audio/*,*/*;q=0.8'
+        },
         responseType: 'blob',
         timeout: 45000,
         onload: response => {
           if (response.status >= 200 && response.status < 300 && response.response) {
-            resolve(response.response);
+            const blob = response.response;
+            const size = Number(blob && blob.size) || 0;
+            const type = clean(blob && blob.type).toLowerCase();
+            if (size < 512) {
+              reject(new Error(`audio blob too small (${size} bytes)`));
+              return;
+            }
+            if (/^(text|application\/json)/i.test(type)) {
+              reject(new Error(`unexpected audio content-type ${type}`));
+              return;
+            }
+            resolve(blob);
             return;
           }
           reject(new Error(`HTTP ${response.status}`));
@@ -700,6 +827,26 @@
         ontimeout: () => reject(new Error('timeout'))
       });
     });
+  }
+
+  function makePlayDebug(clip, mode, extra) {
+    return {
+      mode,
+      title: clip && clip.title || '',
+      id: clip && clip.id || '',
+      hasAudioUrl: Boolean(clip && clip.audioUrl),
+      audioHost: audioHost(clip && clip.audioUrl),
+      at: new Date().toISOString(),
+      ...(extra || {})
+    };
+  }
+
+  function audioHost(url) {
+    try {
+      return new URL(url || '').hostname;
+    } catch (_) {
+      return '';
+    }
   }
 
   function isAllowedAudioUrl(url) {
@@ -731,7 +878,7 @@
           playViaBlob(clip, `Play blocked: ${error && error.message ? error.message : String(error)}. Trying GM blob fallback...`);
           return;
         }
-        setStatus(`Play blocked: ${error && error.message ? error.message : String(error)}`);
+        setStatusOnly(`Play blocked: ${error && error.message ? error.message : String(error)}`);
       });
     } else {
       audio.pause();
@@ -797,6 +944,28 @@
       time.innerHTML = `${formatTime(currentTime)} / ${formatTime(duration)} ${playing ? '<span class="nsr-good">playing</span>' : '<span>paused</span>'}`;
     }
     if (playButton) playButton.textContent = playing ? 'Pause' : 'Play';
+  }
+
+  function updateStatusUi() {
+    if (!state.body) return;
+    const status = state.body.querySelector('[data-nsr-status]');
+    if (status) status.textContent = state.status;
+  }
+
+  function rememberPanelScroll() {
+    if (!state.body) return null;
+    const list = state.body.querySelector('[data-nsr-list]');
+    return {
+      bodyTop: state.body.scrollTop,
+      listTop: list ? list.scrollTop : 0
+    };
+  }
+
+  function restorePanelScroll(saved) {
+    if (!saved || !state.body) return;
+    const list = state.body.querySelector('[data-nsr-list]');
+    state.body.scrollTop = saved.bodyTop || 0;
+    if (list) list.scrollTop = saved.listTop || 0;
   }
 
   function startAudioReactive() {
@@ -918,7 +1087,9 @@
       '--nsr-active-a2': (0.05 + react * 0.12).toFixed(3),
       '--nsr-active-outline-a': (0.55 + react * 0.35).toFixed(3),
       '--nsr-progress-blur': `${Math.round(6 + react * 16)}px`,
-      '--nsr-eq-blur': `${Math.round(8 + react * 18)}px`
+      '--nsr-eq-blur': `${Math.round(8 + react * 18)}px`,
+      '--nsr-lyrics-border-a': (0.22 + react * 0.34).toFixed(3),
+      '--nsr-lyrics-glow-a': (0.08 + react * 0.20).toFixed(3)
     };
     applyFxClasses();
 
@@ -1127,8 +1298,8 @@
       #nova-suno-lyrics-panel,
       #nova-suno-lyrics-panel *{box-sizing:border-box;font-family:Verdana, Geneva, sans-serif;}
       #nova-suno-lyrics-panel{--nsr-react:0;--nsr-h1:188;--nsr-h2:264;--nsr-h3:322;position:fixed!important;right:430px;bottom:132px;width:520px;max-width:calc(100vw - 24px);max-height:calc(100vh - 40px);z-index:2147483647!important;pointer-events:auto!important;color:#f8fafc;background:#080a12;border:1px solid rgba(167,139,250,.65);border-radius:18px;box-shadow:0 0 30px rgba(167,139,250,.28),0 16px 55px rgba(0,0,0,.55);overflow:hidden;}
-      #nova-suno-lyrics-panel.nsr-theme-rgb{animation:nsrRgbGlow 9s linear infinite;}
       #nova-suno-lyrics-panel .nsr-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;background:linear-gradient(120deg,#111827,#312e81 48%,#082f49);cursor:move;}
+      #nova-suno-lyrics-panel.nsr-fx-on.nsr-part-lyrics .nsr-head{background:linear-gradient(120deg,hsl(var(--nsr-h1) 82% var(--nsr-head-l1,14%)),hsl(var(--nsr-h2) 78% var(--nsr-head-l2,16%)) 52%,hsl(var(--nsr-h3) 72% 16%));}
       #nova-suno-lyrics-panel .nsr-title{font-weight:900;letter-spacing:.2px;}
       #nova-suno-lyrics-panel .nsr-body{padding:12px;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 110px);overflow:auto;}
       #nova-suno-lyrics-panel .nsr-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
@@ -1136,6 +1307,8 @@
       #nova-suno-lyrics-panel .nsr-song-title{font-weight:900;font-size:15px;line-height:1.25;}
       #nova-suno-lyrics-panel .nsr-muted{font-size:11px;color:#aab5c7;line-height:1.35;}
       #nova-suno-lyrics-panel .nsr-prompt{max-height:calc(100vh - 260px);overflow:auto;white-space:pre-wrap;font-size:13px;line-height:1.55;color:#dbeafe;background:rgba(2,6,23,.45);border:1px solid rgba(148,163,184,.18);border-radius:12px;padding:12px;}
+      #nova-suno-lyrics-panel.nsr-fx-on.nsr-part-lyrics .nsr-card,
+      #nova-suno-lyrics-panel.nsr-fx-on.nsr-part-lyrics .nsr-prompt{border-color:hsla(var(--nsr-h1),96%,65%,var(--nsr-lyrics-border-a,.22));box-shadow:0 0 var(--nsr-progress-blur,6px) hsla(var(--nsr-h2),96%,62%,var(--nsr-lyrics-glow-a,.08));}
       #nova-suno-lyrics-panel .nsr-btn,
       #nova-suno-lyrics-panel .nsr-head button{border:1px solid rgba(56,189,248,.75);background:#151a29;color:#fff;border-radius:9px;padding:7px 9px;font-size:12px;font-weight:800;cursor:pointer;}
       #nova-suno-lyrics-panel .nsr-btn:hover,
@@ -1169,19 +1342,26 @@
   function makeDraggable(panel, handle, storageKey = STORAGE.panelPos) {
     handle.addEventListener('mousedown', event => {
       if (event.button !== 0) return;
-      if (event.target && event.target.closest('button')) return;
+      const clickedButton = event.target && event.target.closest ? event.target.closest('button') : null;
+      if (clickedButton && clickedButton !== handle && clickedButton !== panel) return;
       const rect = panel.getBoundingClientRect();
       state.dragging = {
         panel,
         storageKey,
         dx: event.clientX - rect.left,
-        dy: event.clientY - rect.top
+        dy: event.clientY - rect.top,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false
       };
       event.preventDefault();
     });
 
     window.addEventListener('mousemove', event => {
       if (!state.dragging || state.dragging.panel !== panel) return;
+      if (Math.abs(event.clientX - state.dragging.startX) > 4 || Math.abs(event.clientY - state.dragging.startY) > 4) {
+        state.dragging.moved = true;
+      }
       const left = Math.max(8, Math.min(event.clientX - state.dragging.dx, window.innerWidth - panel.offsetWidth - 8));
       const top = Math.max(8, Math.min(event.clientY - state.dragging.dy, window.innerHeight - panel.offsetHeight - 8));
       panel.style.left = `${left}px`;
@@ -1196,6 +1376,10 @@
       state.dragging = null;
       const rect = panel.getBoundingClientRect();
       writeJson(activeDrag.storageKey, { left: rect.left, top: rect.top });
+      if (activeDrag.panel === state.orb && activeDrag.moved) {
+        state.suppressOrbClick = true;
+        setTimeout(() => { state.suppressOrbClick = false; }, 0);
+      }
     });
   }
 
@@ -1210,12 +1394,18 @@
     orb.textContent = 'Nova Music';
     if (PRIME_MODE) orb.style.display = 'none';
     orb.addEventListener('click', () => {
+      if (state.suppressOrbClick) {
+        state.suppressOrbClick = false;
+        return;
+      }
       state.open = !state.open;
       GM_setValue(STORAGE.minimized, !state.open);
       render();
     });
     document.body.appendChild(orb);
     state.orb = orb;
+    restorePosition(orb, STORAGE.orbPos);
+    makeDraggable(orb, orb, STORAGE.orbPos);
 
     const panel = document.createElement('div');
     panel.id = 'nova-suno-remote-panel';
@@ -1273,6 +1463,7 @@
     state.lyricsOpen = true;
     state.lyricsPanel.style.display = 'block';
     renderLyricsPanel();
+    refreshFxVisuals();
     setStatus('Lyrics reader opened.');
   }
 
@@ -1435,6 +1626,7 @@
 
   function render() {
     if (!state.ready || !state.panel || !state.body) return;
+    const savedScroll = rememberPanelScroll();
     applyFilter();
     state.panel.classList.toggle('nsr-hidden', !state.open);
     state.panel.classList.toggle('nsr-theme-rgb', state.theme === 'rgb');
@@ -1479,11 +1671,12 @@
         <button class="nsr-btn ${state.view === 'debug' ? 'active' : ''}" data-nsr-view="debug">Debug</button>
       </div>
 
-      <div class="nsr-status">${esc(state.status)}</div>
+      <div class="nsr-status" data-nsr-status="1">${esc(state.status)}</div>
       ${renderView()}
     `;
     if (state.lyricsOpen) renderLyricsPanel();
     if (state.fxOpen) renderFxPanel();
+    restorePanelScroll(savedScroll);
   }
 
   function renderView() {
@@ -1494,7 +1687,7 @@
 
   function renderLibrary() {
     const list = state.filtered.length ? state.filtered : state.library;
-    const items = list.slice(0, 80).map((clip, idx) => `
+    const items = list.map((clip, idx) => `
       <div class="nsr-item ${idx === state.index ? 'active' : ''}">
         ${clip.imageUrl ? `<img class="nsr-thumb" src="${esc(clip.imageUrl)}" alt="">` : '<div class="nsr-thumb"></div>'}
         <div>
@@ -1508,7 +1701,7 @@
     return `
       <input class="nsr-search" data-nsr-search="1" value="${esc(state.query)}" placeholder="Search saved Suno songs...">
       <div class="nsr-muted">${state.library.length} saved | ${list.length} visible</div>
-      <div class="nsr-list">${items || '<div class="nsr-muted">No songs saved yet. Try Load Direct. If that fails, Prime Suno.</div>'}</div>
+      <div class="nsr-list" data-nsr-list="1">${items || '<div class="nsr-muted">No songs saved yet. Try Load Direct. If that fails, Prime Suno.</div>'}</div>
     `;
   }
 
@@ -1529,6 +1722,7 @@
     const userId = clean(GM_getValue(STORAGE.userId, ''));
     const lastPrime = Number(GM_getValue(STORAGE.lastPrimeAt, '0')) || 0;
     const recipes = readRecipes();
+    const owner = readJson(STORAGE.playOwner, null);
     return `
       <div class="nsr-card">
         <div class="nsr-muted">Version: ${esc(VERSION)}</div>
@@ -1542,6 +1736,12 @@
         <div class="nsr-muted">Saved user id: ${userId ? 'yes' : 'no'}</div>
         <div class="nsr-muted">Last prime: ${lastPrime ? new Date(lastPrime).toLocaleString() : 'never'}</div>
         <div class="nsr-muted">Direct last error: ${esc(state.directLastError || '-')}</div>
+        <div class="nsr-muted">Audio last error: ${esc(state.lastAudioError || '-')}</div>
+        <div class="nsr-muted">Last play mode: ${esc(state.lastPlayDebug && state.lastPlayDebug.mode || '-')}</div>
+        <div class="nsr-muted">Last audio host: ${esc(state.lastPlayDebug && state.lastPlayDebug.audioHost || '-')}</div>
+        <div class="nsr-muted">This tab owns audio: ${owner && owner.tabId === TAB_ID ? 'yes' : 'no'}</div>
+        <div class="nsr-muted">Audio owner: ${esc(owner && owner.title || '-')}</div>
+        <div class="nsr-muted">Bootstrap: ${state.bootstrap.registered ? `registered with ${esc(state.bootstrap.host)}` : 'standalone'}</div>
         <div class="nsr-row" style="margin-top:8px;">
           <button class="nsr-btn" data-nsr="copy-debug">Copy Debug</button>
           <button class="nsr-btn" data-nsr="clear">Clear Saved</button>
@@ -1645,6 +1845,12 @@
       hasUserId: Boolean(clean(GM_getValue(STORAGE.userId, ''))),
       lastPrimeAt: GM_getValue(STORAGE.lastPrimeAt, ''),
       directLastError: state.directLastError,
+      lastAudioError: state.lastAudioError,
+      lastPlayDebug: state.lastPlayDebug,
+      audioElement: audioElementSnapshot(),
+      tabId: TAB_ID,
+      activeAudioOwner: readJson(STORAGE.playOwner, null),
+      bootstrap: state.bootstrap,
       currentClip: currentClip() ? {
         title: currentClip().title,
         hasAudioUrl: Boolean(currentClip().audioUrl),
@@ -1653,6 +1859,22 @@
       } : null
     };
     copyText(JSON.stringify(payload, null, 2)).then(() => setStatus('Debug copied.'));
+  }
+
+  function audioElementSnapshot() {
+    const audio = state.audio;
+    if (!audio) return null;
+    return {
+      srcKind: audio.src ? (audio.src.startsWith('blob:') ? 'blob' : 'direct') : 'none',
+      paused: audio.paused,
+      muted: audio.muted,
+      volume: audio.volume,
+      currentTime: Number.isFinite(audio.currentTime) ? Number(audio.currentTime.toFixed(2)) : null,
+      duration: Number.isFinite(audio.duration) ? Number(audio.duration.toFixed(2)) : null,
+      readyState: audio.readyState,
+      networkState: audio.networkState,
+      errorCode: audio.error ? audio.error.code : null
+    };
   }
 
   function createPrimeHud() {
@@ -1937,6 +2159,7 @@
       });
       GM_registerMenuCommand('Nova Suno Remote: Reset Position', () => {
         GM_setValue(STORAGE.panelPos, '');
+        GM_setValue(STORAGE.orbPos, '');
         state.open = true;
         GM_setValue(STORAGE.minimized, false);
         if (state.panel) {
@@ -1944,6 +2167,12 @@
           state.panel.style.top = '';
           state.panel.style.right = '18px';
           state.panel.style.bottom = '132px';
+        }
+        if (state.orb) {
+          state.orb.style.left = '';
+          state.orb.style.top = '';
+          state.orb.style.right = '18px';
+          state.orb.style.bottom = '88px';
         }
         initUi();
         keepUiOnTop();
@@ -1958,6 +2187,76 @@
     }
   }
 
+  function startBootstrapRegistration() {
+    if (PRIME_MODE) return;
+    const attempt = () => {
+      bootstrapAttempts++;
+      if (registerWithBootstrap()) {
+        clearInterval(bootstrapTimer);
+        bootstrapTimer = null;
+        return;
+      }
+      if (bootstrapAttempts >= 40) {
+        clearInterval(bootstrapTimer);
+        bootstrapTimer = null;
+      }
+    };
+    attempt();
+    if (!state.bootstrap.registered) bootstrapTimer = setInterval(attempt, 500);
+  }
+
+  function registerWithBootstrap() {
+    const root = getUnsafeRoot();
+    const api = window.NovaSunoRemoteAnyPage;
+    if (!api) return false;
+
+    const core = root.NovaCore || window.NovaCore || root.NovaWorkHub || window.NovaWorkHub;
+    if (!core) return false;
+
+    const moduleApi = {
+      id: 'suno-remote',
+      name: 'Nova Suno Remote',
+      version: VERSION,
+      category: 'Personal',
+      kind: 'player',
+      show: api.show,
+      hide: api.hide,
+      toggle: () => {
+        if (state.open) api.hide();
+        else api.show();
+      },
+      prime: api.prime,
+      primeFull: api.primeFull,
+      rgbLab: api.rgbLab,
+      debug: api.debug
+    };
+
+    try {
+      if (typeof core.registerModule === 'function') {
+        core.registerModule(moduleApi.id, moduleApi);
+      } else {
+        core.modules = core.modules || {};
+        core.modules[moduleApi.id] = moduleApi;
+      }
+      state.bootstrap = {
+        registered: true,
+        host: core.name || (core === root.NovaCore || core === window.NovaCore ? 'NovaCore' : 'NovaWorkHub')
+      };
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function getUnsafeRoot() {
+    try {
+      if (typeof unsafeWindow !== 'undefined' && unsafeWindow) return unsafeWindow;
+    } catch (_) {
+      // ignored
+    }
+    return window;
+  }
+
   boot();
 
   window.NovaSunoRemoteAnyPage = {
@@ -1969,7 +2268,7 @@
     rescue: keepUiOnTop,
     show: () => { state.open = true; GM_setValue(STORAGE.minimized, false); initUi(); keepUiOnTop(); render(); },
     hide: () => { state.open = false; GM_setValue(STORAGE.minimized, true); render(); },
-    resetPosition: () => { GM_setValue(STORAGE.panelPos, ''); location.reload(); },
+    resetPosition: () => { GM_setValue(STORAGE.panelPos, ''); GM_setValue(STORAGE.orbPos, ''); location.reload(); },
     debug: () => ({
       version: VERSION,
       href: location.href,
@@ -1991,4 +2290,6 @@
   } catch (_) {
     // ignored
   }
+
+  startBootstrapRegistration();
 })();
