@@ -5,7 +5,7 @@
 
   if (window.NovaMenu) return;
 
-  const VERSION = '2.3.3';
+  const VERSION = '2.3.4';
   const ORB_ID = 'nova-modules-button';
   const MENU_ID = 'nova-modules-menu';
   const STYLE_ID = 'nova-menu-style';
@@ -343,8 +343,8 @@
 
     const cards = items.map((m) => {
       const api = m.api && window[m.api] ? window[m.api] : null;
-      const canLoad = window.NovaModuleLoader && window.NovaModuleLoader.canLoad
-        ? window.NovaModuleLoader.canLoad(m)
+      const canLoad = window.NovaModuleLoader && window.NovaModuleLoader.canManuallyLoad
+        ? window.NovaModuleLoader.canManuallyLoad(m)
         : true;
       const loaded = isLoaded(m);
       const button = loaded ? 'Open' : canLoad ? 'Launch' : 'Wrong site';
