@@ -5,7 +5,7 @@
 
   if (window.NovaMenu) return;
 
-  const VERSION = '2.2.0';
+  const VERSION = '2.3.0';
   const ORB_ID = 'nova-modules-button';
   const MENU_ID = 'nova-modules-menu';
   const STYLE_ID = 'nova-menu-style';
@@ -18,11 +18,12 @@
     panel: null,
     repairTimer: null,
     observer: null,
-    repairing: false
+    repairing: false,
+    lastRegistrySource: 'none'
   };
 
   function esc(value) {
-    return String(value || '')
+    return String(value == null ? '' : value)
       .replaceAll('&', '&amp;')
       .replaceAll('<', '&lt;')
       .replaceAll('>', '&gt;')
@@ -30,8 +31,68 @@
       .replaceAll("'", '&#039;');
   }
 
+  function manifestFromBootstrap() {
+    try {
+      if (window.NovaBootstrap && typeof window.NovaBootstrap.getManifest === 'function') {
+        return window.NovaBootstrap.getManifest();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function registryInfo() {
+    try {
+      if (window.Nova && Array.isArray(window.Nova.modulesRegistry) && window.Nova.modulesRegistry.length) {
+        state.lastRegistrySource = 'Nova registry';
+        return {
+          source: state.lastRegistrySource,
+          version: window.Nova.version || 'unknown',
+          build: window.Nova.build || 'unknown',
+          items: window.Nova.modulesRegistry.slice()
+        };
+      }
+    } catch (_) {}
+
+    const manifest = manifestFromBootstrap();
+    if (manifest) {
+      const core = Array.isArray(manifest.core)
+        ? manifest.core.map((item) => ({ ...item, core: true }))
+        : [];
+      const modules = Array.isArray(manifest.modules)
+        ? manifest.modules.map((item) => ({ ...item, core: false }))
+        : [];
+
+      state.lastRegistrySource = 'Bootstrap manifest';
+      return {
+        source: state.lastRegistrySource,
+        version: manifest.version || 'unknown',
+        build: manifest.build || `manifest-${manifest.version || 'unknown'}`,
+        items: [...core, ...modules]
+      };
+    }
+
+    try {
+      if (window.Nova && window.Nova.manifest) {
+        const manifest = window.Nova.manifest;
+        state.lastRegistrySource = 'Nova manifest';
+        return {
+          source: state.lastRegistrySource,
+          version: manifest.version || 'unknown',
+          build: manifest.build || `manifest-${manifest.version || 'unknown'}`,
+          items: [
+            ...(manifest.core || []).map((item) => ({ ...item, core: true })),
+            ...(manifest.modules || []).map((item) => ({ ...item, core: false }))
+          ]
+        };
+      }
+    } catch (_) {}
+
+    state.lastRegistrySource = 'none';
+    return { source: 'none', version: 'missing', build: 'missing', items: [] };
+  }
+
   function modules() {
-    return window.Nova && Array.isArray(window.Nova.modulesRegistry) ? window.Nova.modulesRegistry : [];
+    return registryInfo().items;
   }
 
   function userModules() {
@@ -49,22 +110,24 @@
 
   function injectStyle() {
     if (document.getElementById(STYLE_ID)) return;
+
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      #${ORB_ID}{position:fixed;right:16px;bottom:16px;z-index:2147483647;width:58px;height:38px;border-radius:999px;border:1px solid var(--nova-border,rgba(34,211,238,.75));background:rgba(10,10,18,.96);color:#fff;font:800 13px Arial,sans-serif;box-shadow:var(--nova-glow,0 0 18px rgba(34,211,238,.55));cursor:pointer;user-select:none;touch-action:none;}
-      #${MENU_ID}{position:fixed;width:min(430px,calc(100vw - 24px));max-height:min(760px,calc(100vh - 80px));overflow:hidden;z-index:2147483646;background:rgba(10,10,18,.98);color:#fff;border:1px solid var(--nova-border,rgba(34,211,238,.45));box-shadow:var(--nova-glow,0 0 24px rgba(34,211,238,.38));border-radius:16px;font:12px Arial,sans-serif;display:none;}
-      #${MENU_ID} *{box-sizing:border-box;}
-      #${MENU_ID} button{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(34,211,238,.45);border-radius:9px;padding:7px 9px;cursor:pointer;font:700 12px Arial,sans-serif;}
-      #${MENU_ID} button:hover{background:rgba(34,211,238,.16);}
-      #${MENU_ID} .nova-menu-head{padding:12px;background:linear-gradient(90deg,var(--nova-accent,#22d3ee),var(--nova-accent-2,#8b5cf6));display:flex;justify-content:space-between;align-items:center;font-weight:900;}
-      #${MENU_ID} .nova-menu-tabs{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;gap:8px;}
-      #${MENU_ID} .nova-menu-body{padding:10px;overflow:auto;max-height:min(640px,calc(100vh - 180px));}
-      #${MENU_ID} .nova-card{background:rgba(255,255,255,.045);border:1px solid rgba(34,211,238,.22);border-radius:12px;padding:10px;margin-bottom:10px;}
-      #${MENU_ID} .nova-muted{color:#9ca3af;line-height:1.35;}
-      #${MENU_ID} .nova-grid{display:grid;gap:6px;}
-      #${MENU_ID} .nova-pill{display:inline-block;font-size:11px;margin-top:6px;}
+      #${ORB_ID}{position:fixed;right:16px;bottom:16px;z-index:2147483647;width:58px;height:38px;border-radius:999px;border:1px solid var(--nova-border,rgba(34,211,238,.75));background:rgba(10,10,18,.96);color:#fff;font:800 13px Arial,sans-serif;box-shadow:var(--nova-glow,0 0 18px rgba(34,211,238,.55));cursor:pointer;user-select:none;touch-action:none}
+      #${MENU_ID}{position:fixed;width:min(430px,calc(100vw - 24px));max-height:min(760px,calc(100vh - 80px));overflow:hidden;z-index:2147483646;background:rgba(10,10,18,.98);color:#fff;border:1px solid var(--nova-border,rgba(34,211,238,.45));box-shadow:var(--nova-glow,0 0 24px rgba(34,211,238,.38));border-radius:16px;font:12px Arial,sans-serif;display:none}
+      #${MENU_ID} *{box-sizing:border-box}
+      #${MENU_ID} button{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(34,211,238,.45);border-radius:9px;padding:7px 9px;cursor:pointer;font:700 12px Arial,sans-serif}
+      #${MENU_ID} button:hover{background:rgba(34,211,238,.16)}
+      #${MENU_ID} .nova-menu-head{padding:12px;background:linear-gradient(90deg,var(--nova-accent,#22d3ee),var(--nova-accent-2,#8b5cf6));display:flex;justify-content:space-between;align-items:center;font-weight:900}
+      #${MENU_ID} .nova-menu-tabs{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;gap:8px}
+      #${MENU_ID} .nova-menu-body{padding:10px;overflow:auto;max-height:min(640px,calc(100vh - 180px))}
+      #${MENU_ID} .nova-card{background:rgba(255,255,255,.045);border:1px solid rgba(34,211,238,.22);border-radius:12px;padding:10px;margin-bottom:10px}
+      #${MENU_ID} .nova-muted{color:#9ca3af;line-height:1.35}
+      #${MENU_ID} .nova-grid{display:grid;gap:6px}
+      #${MENU_ID} .nova-pill{display:inline-block;font-size:11px;margin-top:6px}
     `;
+
     (document.head || document.documentElement).appendChild(style);
   }
 
@@ -80,7 +143,7 @@
       orb.style.top = clamp(Number(pos.y) || 16, 4, window.innerHeight - 42) + 'px';
       orb.style.right = 'auto';
       orb.style.bottom = 'auto';
-    } catch (error) {}
+    } catch (_) {}
   }
 
   function removeDuplicate(id, keep) {
@@ -108,16 +171,27 @@
     bindOrbDrag(orb);
     document.body.appendChild(orb);
     state.orb = orb;
-    if (window.NovaOrbExtras && typeof window.NovaOrbExtras.scan === 'function') setTimeout(window.NovaOrbExtras.scan, 0);
+
+    if (window.NovaOrbExtras && typeof window.NovaOrbExtras.scan === 'function') {
+      setTimeout(() => window.NovaOrbExtras.scan(), 0);
+    }
+
     return orb;
   }
 
   function bindOrbDrag(orb) {
-    let down = false, moved = false, sx = 0, sy = 0, sl = 0, st = 0;
+    let down = false;
+    let moved = false;
+    let sx = 0;
+    let sy = 0;
+    let sl = 0;
+    let st = 0;
+
     function point(event) {
       const touch = event.touches && event.touches[0] ? event.touches[0] : event;
       return { x: touch.clientX, y: touch.clientY };
     }
+
     function start(event) {
       const p = point(event);
       const rect = orb.getBoundingClientRect();
@@ -133,6 +207,7 @@
       document.addEventListener('touchend', end, true);
       event.preventDefault();
     }
+
     function move(event) {
       if (!down) return;
       const p = point(event);
@@ -148,17 +223,21 @@
       if (state.open) placePanelNearOrb();
       event.preventDefault();
     }
+
     function end() {
       if (!down) return;
       down = false;
       const rect = orb.getBoundingClientRect();
-      try { localStorage.setItem(POS_KEY, JSON.stringify({ x: Math.round(rect.left), y: Math.round(rect.top) })); } catch (error) {}
+      try {
+        localStorage.setItem(POS_KEY, JSON.stringify({ x: Math.round(rect.left), y: Math.round(rect.top) }));
+      } catch (_) {}
       document.removeEventListener('mousemove', move, true);
       document.removeEventListener('mouseup', end, true);
       document.removeEventListener('touchmove', move, true);
       document.removeEventListener('touchend', end, true);
       if (!moved) window.NovaMenu.toggle();
     }
+
     orb.addEventListener('mousedown', start, true);
     orb.addEventListener('touchstart', start, true);
   }
@@ -185,6 +264,7 @@
     const panel = createPanel();
     const orb = createOrb();
     if (!panel || !orb) return;
+
     const o = orb.getBoundingClientRect();
     const w = panel.offsetWidth || 430;
     const h = panel.offsetHeight || 520;
@@ -198,6 +278,16 @@
     panel.style.bottom = 'auto';
   }
 
+  function isLoaded(module) {
+    if (!module) return false;
+    if (module.api && window[module.api]) return true;
+    return Boolean(
+      window.NovaModuleLoader &&
+      window.NovaModuleLoader.loaded &&
+      window.NovaModuleLoader.loaded.has(module.id)
+    );
+  }
+
   function statusLine(loaded, canLoad) {
     if (loaded) return '<span style="color:#22c55e;">loaded</span>';
     if (canLoad) return '<span style="color:#38bdf8;">ready</span>';
@@ -205,23 +295,30 @@
   }
 
   function renderModules() {
-    const items = userModules();
+    const info = registryInfo();
+    const items = info.items.filter((m) => m && !m.core && m.type !== 'devkit' && m.enabled !== false);
+
     if (!items.length) {
-      return '<div class="nova-muted" style="padding:10px;">No user modules registered for this page yet.</div>';
+      return `
+        <div class="nova-muted" style="padding:10px;">No user modules registered for this page yet.</div>
+        <div class="nova-muted" style="padding:0 10px 10px;font-size:10px;">Registry: ${esc(info.source)} · ${esc(info.version)}</div>`;
     }
 
-    return items.map((m) => {
+    const cards = items.map((m) => {
       const api = m.api && window[m.api] ? window[m.api] : null;
-      const canLoad = window.NovaModuleLoader && window.NovaModuleLoader.canLoad ? window.NovaModuleLoader.canLoad(m) : true;
-      const loaded = window.NovaModuleLoader && window.NovaModuleLoader.loaded && window.NovaModuleLoader.loaded.has(m.id);
+      const canLoad = window.NovaModuleLoader && window.NovaModuleLoader.canLoad
+        ? window.NovaModuleLoader.canLoad(m)
+        : true;
+      const loaded = isLoaded(m);
       const button = loaded ? 'Open' : canLoad ? 'Launch' : 'Wrong site';
+
       return `
         <div class="nova-card">
           <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
             <div style="min-width:0;">
               <div style="font-weight:900;font-size:13px;color:#fff;">${esc(m.name || m.id)}</div>
               <div class="nova-muted" style="margin-top:4px;">${esc(m.description || '')}</div>
-              <div class="nova-pill">${statusLine(loaded, canLoad)}</div>
+              <div class="nova-pill">${statusLine(loaded, canLoad)} · v${esc(m.version || 'latest')}</div>
             </div>
             <div style="display:flex;gap:6px;flex-direction:column;">
               <button data-nova-launch="${esc(m.id)}">${button}</button>
@@ -230,6 +327,8 @@
           </div>
         </div>`;
     }).join('');
+
+    return cards + `<div class="nova-muted" style="padding:0 2px 2px;font-size:10px;">Registry: ${esc(info.source)} · ${esc(info.version)} · ${items.length} user module${items.length === 1 ? '' : 's'}</div>`;
   }
 
   function themeCard() {
@@ -237,13 +336,18 @@
     if (!api || !api.getThemes) {
       return '<div class="nova-card"><b style="color:#f87171;">Themes missing</b><div class="nova-muted">NovaTheme is not loaded.</div></div>';
     }
+
     const themes = api.getThemes();
-    const current = api.getCurrentThemeId ? api.getCurrentThemeId() : (api.current && api.current().name) || 'default';
+    const current = api.getCurrentThemeId
+      ? api.getCurrentThemeId()
+      : (api.current && api.current().name) || 'default';
+
     const buttons = Object.entries(themes).map(([id, theme]) => {
       const active = id === current;
       const border = active ? 'rgba(34,197,94,.75)' : theme.border || 'rgba(255,255,255,.18)';
       return `<button data-nova-theme="${esc(id)}" title="${esc(theme.description || '')}" style="border-color:${esc(border)};text-align:left;${active ? 'box-shadow:0 0 12px rgba(34,197,94,.35);' : ''}">${active ? '* ' : ''}${esc(theme.name || id)}</button>`;
     }).join('');
+
     return `<div class="nova-card"><b style="color:#22d3ee;text-transform:uppercase;letter-spacing:.06em;">Themes</b><div class="nova-muted" style="margin:6px 0;">Current: ${esc(current)}</div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;">${buttons}</div></div>`;
   }
 
@@ -254,68 +358,55 @@
   function sessionCard() {
     const session = window.NovaSession && window.NovaSession.current ? window.NovaSession.current : null;
     const active = window.NovaSession && window.NovaSession.isActive && window.NovaSession.isActive();
-    const stats = window.NovaSession && window.NovaSession.getStats ? window.NovaSession.getStats() : { pages: 0, events: 0, byHost: {} };
+    const stats = window.NovaSession && window.NovaSession.getStats
+      ? window.NovaSession.getStats()
+      : { pages: 0, events: 0, byHost: {} };
     const status = !session ? 'stopped' : session.paused ? 'paused' : active ? 'recording' : 'stopped';
     const color = status === 'recording' ? '#22c55e' : status === 'paused' ? '#facc15' : '#f87171';
     const hosts = stats && stats.byHost ? Object.keys(stats.byHost).length : 0;
-    return `
-      <div class="nova-card">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b style="color:#c084fc;text-transform:uppercase;letter-spacing:.06em;">Session</b><b style="color:${color};text-transform:uppercase;">${esc(status)}</b></div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;">${statBox(stats.pages || 0, 'Pages')}${statBox(stats.events || 0, 'Events')}${statBox(hosts, 'Hosts')}</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;"><button data-nova-act="session-start">Start Session</button><button data-nova-act="session-pause">Pause</button><button data-nova-act="session-resume">Resume</button><button data-nova-act="session-stop">Stop</button><button data-nova-act="session-clear">Clear</button></div>
-      </div>`;
+
+    return `<div class="nova-card"><div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b style="color:#c084fc;text-transform:uppercase;letter-spacing:.06em;">Session</b><b style="color:${color};text-transform:uppercase;">${esc(status)}</b></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;">${statBox(stats.pages || 0, 'Pages')}${statBox(stats.events || 0, 'Events')}${statBox(hosts, 'Hosts')}</div><div style="display:flex;gap:6px;flex-wrap:wrap;"><button data-nova-act="session-start">Start Session</button><button data-nova-act="session-pause">Pause</button><button data-nova-act="session-resume">Resume</button><button data-nova-act="session-stop">Stop</button><button data-nova-act="session-clear">Clear</button></div></div>`;
   }
 
   function traceCard() {
     const hasTrace = Boolean(window.NovaTraceNetwork);
-    const s = hasTrace && window.NovaTraceNetwork.getStatus ? window.NovaTraceNetwork.getStatus() : { enabled: false, persisted: false, pageCount: 0, localEvents: 0, startedAt: null };
-    const text = s.enabled ? 'active' : s.persisted ? 'armed' : 'off';
-    return `
-      <div class="nova-card">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b style="color:#22d3ee;text-transform:uppercase;letter-spacing:.06em;">DevKit / Trace</b><b style="color:${s.enabled ? '#22c55e' : '#f87171'};text-transform:uppercase;">${esc(text)}</b></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;"><button data-nova-act="trace-start">Start Trace</button><button data-nova-act="trace-stop">Stop Trace</button><button data-nova-act="trace-clear">Clear Trace</button><button data-nova-act="trace-copy">Copy Trace</button></div>
-        <div class="nova-muted" style="margin-top:8px;">API: ${hasTrace ? 'ready' : 'missing'} | Pages: ${s.pageCount || 0} | Events: ${s.localEvents || 0}</div>
-      </div>`;
+    const s = hasTrace && window.NovaTraceNetwork.getStatus
+      ? window.NovaTraceNetwork.getStatus()
+      : { enabled: false, persisted: false, pageCount: 0, localEvents: 0 };
+    const text = s.enabled ? 'active' : s.persisted ? 'armed' : hasTrace ? 'off' : 'unavailable';
+
+    return `<div class="nova-card"><div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b style="color:#22d3ee;text-transform:uppercase;letter-spacing:.06em;">DevKit / Trace</b><b style="color:${s.enabled ? '#22c55e' : hasTrace ? '#f87171' : '#facc15'};text-transform:uppercase;">${esc(text)}</b></div><div style="display:flex;gap:6px;flex-wrap:wrap;"><button data-nova-act="trace-start">Start Trace</button><button data-nova-act="trace-stop">Stop Trace</button><button data-nova-act="trace-clear">Clear Trace</button><button data-nova-act="trace-copy">Copy Trace</button></div><div class="nova-muted" style="margin-top:8px;">API: ${hasTrace ? 'ready' : 'optional/unavailable'} | Pages: ${s.pageCount || 0} | Events: ${s.localEvents || 0}</div></div>`;
   }
 
   function domCard() {
     const hasDom = Boolean(window.NovaDOMInspector);
     const summary = hasDom && window.NovaDOMInspector.summary ? window.NovaDOMInspector.summary() : null;
     const c = summary ? summary.counts : { totalElements: 0, buttons: 0, inputs: 0, links: 0, tables: 0 };
-    return `
-      <div class="nova-card">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b style="color:#38bdf8;text-transform:uppercase;letter-spacing:.06em;">DevKit / DOM Inspector</b><b style="color:${hasDom ? '#22c55e' : '#f87171'};text-transform:uppercase;">${hasDom ? 'ready' : 'missing'}</b></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"><button data-nova-act="dom-summary">Copy DOM Summary</button><button data-nova-act="dom-full">Copy Full DOM</button></div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;">${statBox(c.totalElements || 0, 'All')}${statBox(c.buttons || 0, 'Btns')}${statBox(c.inputs || 0, 'Inputs')}${statBox(c.links || 0, 'Links')}${statBox(c.tables || 0, 'Tables')}</div>
-      </div>`;
+
+    return `<div class="nova-card"><div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b style="color:#38bdf8;text-transform:uppercase;letter-spacing:.06em;">DevKit / DOM Inspector</b><b style="color:${hasDom ? '#22c55e' : '#facc15'};text-transform:uppercase;">${hasDom ? 'ready' : 'optional'}</b></div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"><button data-nova-act="dom-summary">Copy DOM Summary</button><button data-nova-act="dom-full">Copy Full DOM</button></div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;">${statBox(c.totalElements || 0, 'All')}${statBox(c.buttons || 0, 'Btns')}${statBox(c.inputs || 0, 'Inputs')}${statBox(c.links || 0, 'Links')}${statBox(c.tables || 0, 'Tables')}</div></div>`;
   }
 
   function bundleCard() {
     const hasBundle = Boolean(window.NovaInvestigationExport);
-    return `
-      <div class="nova-card">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b style="color:#f0abfc;text-transform:uppercase;letter-spacing:.06em;">Investigation Bundle</b><b style="color:${hasBundle ? '#22c55e' : '#f87171'};text-transform:uppercase;">${hasBundle ? 'ready' : 'missing'}</b></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;"><button data-nova-act="bundle-summary">Copy Summary Bundle</button><button data-nova-act="bundle-extended">Copy Extended Bundle</button><button data-nova-act="bundle-full">Copy Full Bundle</button></div>
-      </div>`;
+    return `<div class="nova-card"><div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b style="color:#f0abfc;text-transform:uppercase;letter-spacing:.06em;">Investigation Bundle</b><b style="color:${hasBundle ? '#22c55e' : '#facc15'};text-transform:uppercase;">${hasBundle ? 'ready' : 'optional'}</b></div><div style="display:flex;gap:6px;flex-wrap:wrap;"><button data-nova-act="bundle-summary">Copy Summary Bundle</button><button data-nova-act="bundle-extended">Copy Extended Bundle</button><button data-nova-act="bundle-full">Copy Full Bundle</button></div></div>`;
   }
 
   function coreCard() {
-    return `<div class="nova-card"><b style="color:#22d3ee;text-transform:uppercase;letter-spacing:.06em;">Core</b><div class="nova-grid" style="margin-top:8px;">${coreModules().map((m) => `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:7px;"><b>${esc(m.name || m.id)}</b> <span style="color:#22c55e;float:right;">ENABLED</span><br><span class="nova-muted">API: ${esc(m.api || 'none')}</span></div>`).join('')}</div></div>`;
+    const items = coreModules();
+    return `<div class="nova-card"><b style="color:#22d3ee;text-transform:uppercase;letter-spacing:.06em;">Core</b><div class="nova-grid" style="margin-top:8px;">${items.map((m) => `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:7px;"><b>${esc(m.name || m.id)}</b> <span style="color:${m.required === false ? '#facc15' : '#22c55e'};float:right;">${m.required === false ? 'OPTIONAL' : 'REQUIRED'}</span><br><span class="nova-muted">API: ${esc(m.api || 'none')}</span></div>`).join('') || '<div class="nova-muted">Core registry unavailable.</div>'}</div></div>`;
   }
 
   function renderAdvanced() {
-    const build = window.Nova ? window.Nova.build || 'unknown' : 'missing';
-    return themeCard() + sessionCard() + traceCard() + domCard() + bundleCard() + `<div class="nova-muted" style="margin:8px 0 10px;">Build: ${esc(build)} | Menu: ${VERSION}</div>` + coreCard();
+    const info = registryInfo();
+    return themeCard() + sessionCard() + traceCard() + domCard() + bundleCard() + `<div class="nova-muted" style="margin:8px 0 10px;">Build: ${esc(info.build)} | Manifest: ${esc(info.version)} | Menu: ${VERSION} | Registry: ${esc(info.source)}</div>` + coreCard();
   }
 
   function render() {
     const panel = createPanel();
     if (!panel) return;
     const isModules = state.view === 'modules';
-    panel.innerHTML = `
-      <div class="nova-menu-head"><span>Nova</span><button data-nova-close style="background:rgba(0,0,0,.25);border-color:rgba(255,255,255,.25);padding:4px 8px;">x</button></div>
-      <div class="nova-menu-tabs"><button data-nova-view="modules" style="border-color:${isModules ? 'rgba(34,211,238,.9)' : 'rgba(255,255,255,.18)'};">Modules</button><button data-nova-view="advanced" style="border-color:${!isModules ? 'rgba(168,85,247,.9)' : 'rgba(255,255,255,.18)'};">Advanced</button></div>
-      <div class="nova-menu-body">${isModules ? renderModules() : renderAdvanced()}</div>`;
+
+    panel.innerHTML = `<div class="nova-menu-head"><span>Nova</span><button data-nova-close style="background:rgba(0,0,0,.25);border-color:rgba(255,255,255,.25);padding:4px 8px;">x</button></div><div class="nova-menu-tabs"><button data-nova-view="modules" style="border-color:${isModules ? 'rgba(34,211,238,.9)' : 'rgba(255,255,255,.18)'};">Modules</button><button data-nova-view="advanced" style="border-color:${!isModules ? 'rgba(168,85,247,.9)' : 'rgba(255,255,255,.18)'};">Advanced</button></div><div class="nova-menu-body">${isModules ? renderModules() : renderAdvanced()}</div>`;
     placePanelNearOrb();
   }
 
@@ -333,27 +424,29 @@
   async function launchModule(id) {
     const mod = userModules().find((m) => m.id === id);
     if (!mod || !window.NovaModuleLoader) return;
-    if (window.NovaModuleLoader.loaded && window.NovaModuleLoader.loaded.has(id) && mod.api && window[mod.api] && window[mod.api].show) {
+
+    if (isLoaded(mod) && mod.api && window[mod.api] && window[mod.api].show) {
       window[mod.api].show();
     } else {
       await window.NovaModuleLoader.loadScript(mod);
       if (mod.api && window[mod.api] && window[mod.api].show) window[mod.api].show();
     }
+
     emit('module-launch', 'Module launched from Nova menu', { id });
-    setTimeout(render, 500);
+    setTimeout(render, 250);
   }
 
   function hideModule(id) {
     const mod = userModules().find((m) => m.id === id);
     if (mod && mod.api && window[mod.api] && window[mod.api].hide) window[mod.api].hide();
-    setTimeout(render, 250);
+    setTimeout(render, 100);
   }
 
   function setTheme(id) {
     if (!window.NovaTheme || !window.NovaTheme.setActive) return;
     const ok = window.NovaTheme.setActive(id);
     if (ok) emit('theme-change', 'Nova theme changed from menu', { id });
-    setTimeout(render, 50);
+    setTimeout(render, 30);
   }
 
   function advancedAction(action) {
@@ -372,12 +465,13 @@
     if (action === 'bundle-extended' && window.NovaInvestigationExport) window.NovaInvestigationExport.copyExtended();
     if (action === 'bundle-full' && window.NovaInvestigationExport && window.NovaInvestigationExport.copyFull) window.NovaInvestigationExport.copyFull();
     emit('advanced-action', 'Nova advanced action: ' + action, { action });
-    setTimeout(render, 250);
+    setTimeout(render, 100);
   }
 
   function repair() {
     if (state.repairing || !document.body) return;
     state.repairing = true;
+
     try {
       injectStyle();
       if (!document.getElementById(ORB_ID)) {
@@ -396,13 +490,22 @@
   }
 
   function startRepairLoop() {
-    if (!state.repairTimer) state.repairTimer = setInterval(repair, 1000);
+    if (!state.repairTimer) {
+      state.repairTimer = setInterval(() => {
+        repair();
+        if (state.open) render();
+      }, 1500);
+    }
+
     if (!state.observer && window.MutationObserver && document.documentElement) {
       let queued = false;
       state.observer = new MutationObserver(() => {
         if (queued) return;
         queued = true;
-        setTimeout(() => { queued = false; repair(); }, 80);
+        setTimeout(() => {
+          queued = false;
+          repair();
+        }, 80);
       });
       state.observer.observe(document.documentElement, { childList: true, subtree: true });
     }
@@ -412,9 +515,9 @@
     version: VERSION,
     show() {
       createOrb();
+      state.open = true;
       render();
       if (state.panel) state.panel.style.display = 'block';
-      state.open = true;
       repair();
     },
     hide() {
@@ -429,6 +532,7 @@
       repair();
       if (state.open) render();
     },
+    getRegistryInfo: registryInfo,
     init() {
       createOrb();
       startRepairLoop();
@@ -436,6 +540,12 @@
     },
     repair
   };
+
+  ['nova-module-loaded', 'nova-watch-ready', 'nova-update-ready'].forEach((eventName) => {
+    window.addEventListener(eventName, () => {
+      if (state.open) render();
+    });
+  });
 
   if (document.body) window.NovaMenu.init();
   else document.addEventListener('DOMContentLoaded', () => window.NovaMenu.init(), { once: true });
