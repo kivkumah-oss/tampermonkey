@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "updatedAt": "2026-07-01",
+  "version": "1.1.0",
+  "updatedAt": "2026-07-17",
   "modules": [
     {
       "id": "nova-session",
@@ -50,11 +50,20 @@
     {
       "id": "nova-theme",
       "name": "Nova Theme",
-      "description": "Shared theme engine for Nova windows, panels, and modules.",
+      "description": "Shared theme engine for Nova windows, panels, modules, and the Nova Player RGB visual language.",
       "type": "core",
       "enabled": true,
       "core": true,
       "api": "NovaTheme"
+    },
+    {
+      "id": "nova-audio-theme",
+      "name": "Nova Audio Theme",
+      "description": "Reusable audio analyser and bass-reactive colour engine extracted from Nova Player.",
+      "type": "core",
+      "enabled": true,
+      "core": true,
+      "api": "NovaAudioTheme"
     },
     {
       "id": "nova-menu",
@@ -74,7 +83,9 @@
       "autoload": false,
       "core": false,
       "api": "NovaSunoPlayer",
-      "match": ["https://suno.com/*"],
+      "match": [
+        "https://suno.com/*"
+      ],
       "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-player.js"
     },
     {
