@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      2.2.3
+// @version      2.2.4
 // @description  Install once. Nova Core, modules, updates, cache, and recovery are managed automatically from GitHub.
 // @author       Martins + Nova
 // @match        *://*/*
@@ -20,7 +20,7 @@
 // @connect      cdn1.suno.ai
 // @connect      cdn-o.suno.com
 // @sandbox      JavaScript
-// @run-at       document-idle
+// @run-at       document-start
 // @noframes
 // @updateURL    https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/nova-bootstrap.user.js
 // @downloadURL  https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/bootstrap/nova-bootstrap.user.js
@@ -32,7 +32,7 @@
   if (window.__NOVA_BOOTSTRAP_RUNNING__) return;
   window.__NOVA_BOOTSTRAP_RUNNING__ = true;
 
-  const VERSION = '2.2.3';
+  const VERSION = '2.2.4';
   const MANIFEST_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/nova.manifest.json';
   const TRUSTED_PREFIX = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/';
   const PREFIX = 'nova.bootstrap.v2.';
@@ -498,6 +498,38 @@
     }
   }
 
+  function isSunoPrimeWindow() {
+    try {
+      const host = String(location.hostname || '').toLowerCase();
+      return (host === 'suno.com' || host.endsWith('.suno.com')) &&
+        new URLSearchParams(location.search).has('nova_suno_prime');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function startPrimeCaptureFromCache() {
+    if (!isSunoPrimeWindow()) return;
+
+    const cachedManifest = storageGet(ACTIVE_MANIFEST_KEY, null);
+    const component = cachedManifest && Array.isArray(cachedManifest.modules)
+      ? cachedManifest.modules.find((item) => item && item.id === 'nova-suno-remote-any-page')
+      : null;
+    const cached = component && readComponentCache(component, 'module');
+
+    if (!component || !cached) {
+      warn('Prime popup opened before the Suno module cache was available.');
+      return;
+    }
+
+    try {
+      executeCode(component, cached.code, 'module');
+      log('Started cached Suno Prime capture at document-start.');
+    } catch (error) {
+      warn('Could not start cached Suno Prime capture:', error);
+    }
+  }
+
   async function loadCore(manifest) {
     const core = manifest.core
       .filter((item) => item && item.enabled !== false)
@@ -612,7 +644,8 @@
     getStatus: () => JSON.parse(JSON.stringify(state))
   };
 
-  (async () => {
+  function startNova() {
+    (async () => {
     try {
       updateHud('Nova Bootstrap started', 'Using Firefox CSP-safe userscript sandbox…', 3);
       state.phase = 'manifest';
@@ -650,5 +683,14 @@
     } catch (error) {
       showFatal(error);
     }
-  })();
+    })();
+  }
+
+  // Prime must install its page-network hooks before Suno starts its library request.
+  startPrimeCaptureFromCache();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startNova, { once: true });
+  } else {
+    startNova();
+  }
 })();

@@ -5,7 +5,7 @@
 
   if (window.NovaModuleLoader) return;
 
-  const VERSION = '1.1.5';
+  const VERSION = '1.1.6';
   const loaded = new Set();
   const loading = new Map();
   const LOADED_MODULES_ATTR = 'data-nova-loaded-modules';
@@ -159,6 +159,12 @@
     return matches(module.match);
   }
 
+  function canManuallyLoad(module) {
+    if (!module || !module.id || !module.url) return false;
+    if (module.enabled === false || module.core) return false;
+    return module.manualAnywhere === true || canLoad(module);
+  }
+
   async function fetchCode(module) {
     if (window.NovaBootstrap && typeof window.NovaBootstrap.fetchComponent === 'function') {
       return window.NovaBootstrap.fetchComponent(module, {
@@ -213,8 +219,9 @@
     return false;
   }
 
-  async function loadScript(module) {
-    if (!canLoad(module)) return false;
+  async function loadScript(module, options = {}) {
+    const manual = options.manual === true;
+    if (!(manual ? canManuallyLoad(module) : canLoad(module))) return false;
     if (loaded.has(module.id) || markAlreadyLoaded(module)) return true;
     if (loading.has(module.id)) return loading.get(module.id);
 
@@ -290,9 +297,9 @@
     if (!detail || !detail.id || !['launch', 'hide'].includes(detail.action)) return;
 
     const module = getRegistry().find((item) => item && item.id === detail.id);
-    if (!module || !canLoad(module)) return;
+    if (!module || !canManuallyLoad(module)) return;
 
-    Promise.resolve(loadScript(module)).then((ok) => {
+    Promise.resolve(loadScript(module, { manual: true })).then((ok) => {
       const api = module.api && window[module.api];
       const method = detail.action === 'hide' ? 'hide' : 'show';
       if (ok && api && typeof api[method] === 'function') api[method]();
@@ -311,6 +318,7 @@
     loading,
     matches,
     canLoad,
+    canManuallyLoad,
     getRegistry,
     loadMatching,
     loadScript,
