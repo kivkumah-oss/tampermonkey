@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "version": "2.5.4",
-  "updatedAt": "2026-07-17T16:00:00Z",
-  "bootstrapMinVersion": "2.2.2",
+  "version": "2.6.0",
+  "updatedAt": "2026-07-17T20:45:00Z",
+  "bootstrapMinVersion": "2.2.3",
   "core": [
     {"id":"nova-theme","name":"Nova Theme","description":"Shared colour, layout, RGB, and Nova Player visual-language engine.","version":"1.6.1","order":10,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js"},
     {"id":"nova-audio-theme","name":"Nova Audio Theme","description":"Reusable bass-reactive audio analyser extracted from Nova Player.","version":"0.1.1","order":20,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaAudioTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-audio-theme.js"},
@@ -35,17 +35,16 @@
       "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/watch/nova-watch.js"
     },
     {
-      "id": "nova-suno-player",
-      "name": "Nova Suno Player",
-      "description": "Floating Suno music controller module for play, pause, next, previous, shuffle, and lyrics experiments.",
-      "version": "0.6.1",
+      "id": "nova-suno-remote-any-page",
+      "name": "Nova Suno Remote",
+      "description": "Personal Suno library remote with full-library Prime capture, remote playback, lyrics reader, RGB Lab, and audio-reactive UI.",
+      "version": "0.1.152",
       "type": "module",
       "enabled": true,
       "autoload": false,
       "core": false,
-      "api": "NovaSunoPlayer",
-      "match": ["https://suno.com/*"],
-      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-player.js"
+      "api": "NovaSunoRemoteAnyPage",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-remote-any-page.js"
     }
   ]
 }
