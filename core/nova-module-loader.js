@@ -5,10 +5,13 @@
 
   if (window.NovaModuleLoader) return;
 
-  const VERSION = '1.1.6';
+  const VERSION = '1.1.7';
   const loaded = new Set();
   const loading = new Map();
   const LOADED_MODULES_ATTR = 'data-nova-loaded-modules';
+  const BOOTSTRAP_PREFIX = 'nova.bootstrap.v2.';
+  const BOOTSTRAP_CACHE_INDEX_KEY = BOOTSTRAP_PREFIX + 'cache.index';
+  const BOOTSTRAP_MAX_CACHE_ENTRIES = 80;
 
   function publishLoadedModules() {
     try {
@@ -165,19 +168,87 @@
     return module.manualAnywhere === true || canLoad(module);
   }
 
+  function safeCacheId(value) {
+    return String(value || 'unknown').replace(/[^a-z0-9._-]+/gi, '_');
+  }
+
+  function readGmJson(key, fallback) {
+    if (typeof GM_getValue !== 'function') return fallback;
+    try {
+      const value = GM_getValue(key, fallback);
+      return value === undefined ? fallback : value;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function writeGmValue(key, value) {
+    if (typeof GM_setValue !== 'function') return false;
+    try {
+      GM_setValue(key, value);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function deleteGmValue(key) {
+    if (typeof GM_deleteValue !== 'function') return false;
+    try {
+      GM_deleteValue(key);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function mirrorIntoBootstrapCache(module, code) {
+    if (!module || !module.id || typeof code !== 'string' || !code.trim()) return false;
+
+    const cacheKey = BOOTSTRAP_PREFIX + 'code.module.' + safeCacheId(module.id) + '.' + safeCacheId(module.version || 'latest');
+    const cached = {
+      id: module.id,
+      version: module.version || 'latest',
+      url: module.url,
+      kind: 'module',
+      code,
+      savedAt: new Date().toISOString()
+    };
+
+    if (!writeGmValue(cacheKey, cached)) return false;
+
+    const index = readGmJson(BOOTSTRAP_CACHE_INDEX_KEY, []);
+    const next = (Array.isArray(index) ? index : [])
+      .filter((entry) => entry && entry.key !== cacheKey);
+    next.unshift({ key: cacheKey, touchedAt: Date.now() });
+
+    while (next.length > BOOTSTRAP_MAX_CACHE_ENTRIES) {
+      const removed = next.pop();
+      if (removed && removed.key) deleteGmValue(removed.key);
+    }
+
+    writeGmValue(BOOTSTRAP_CACHE_INDEX_KEY, next);
+    console.log('[Nova Module Loader] Mirrored module into Bootstrap cache', module.id, module.version || 'latest');
+    return true;
+  }
+
   async function fetchCode(module) {
     if (window.NovaBootstrap && typeof window.NovaBootstrap.fetchComponent === 'function') {
-      return window.NovaBootstrap.fetchComponent(module, {
+      const code = await window.NovaBootstrap.fetchComponent(module, {
         kind: 'module',
         preferCache: true
       });
+      mirrorIntoBootstrapCache(module, code);
+      return code;
     }
 
     const version = encodeURIComponent(module.version || 'latest');
     const joiner = module.url.includes('?') ? '&' : '?';
     const response = await fetch(module.url + joiner + 'v=' + version, { cache: 'no-store' });
     if (!response.ok) throw new Error('HTTP ' + response.status);
-    return response.text();
+    const code = await response.text();
+    mirrorIntoBootstrapCache(module, code);
+    return code;
   }
 
   function execute(module, code) {
@@ -324,6 +395,7 @@
     loadScript,
     installEventBridge,
     safeDispatch,
+    mirrorIntoBootstrapCache,
 
     async reload(module) {
       if (!module || !module.id) return false;
