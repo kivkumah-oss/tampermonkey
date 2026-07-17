@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2.6.1",
-  "updatedAt": "2026-07-17T21:00:00Z",
+  "version": "2.6.2",
+  "updatedAt": "2026-07-17T21:15:00Z",
   "bootstrapMinVersion": "2.2.3",
   "core": [
     {"id":"nova-theme","name":"Nova Theme","description":"Shared colour, layout, RGB, and Nova Player visual-language engine.","version":"1.6.1","order":10,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js"},
@@ -41,9 +41,10 @@
       "version": "0.1.152",
       "type": "module",
       "enabled": true,
-      "autoload": false,
+      "autoload": true,
       "core": false,
       "api": "NovaSunoRemoteAnyPage",
+      "match": ["https://suno.com/*"],
       "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-remote-any-page.js"
     }
   ]
