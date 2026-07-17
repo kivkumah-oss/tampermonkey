@@ -4,7 +4,7 @@
 
   if (window.NovaApiBodyCatcher) return;
 
-  const VERSION = '0.1.0-request-shape';
+  const VERSION = '0.2.0-sandbox-safe';
   const MAX_TEXT_CHARS = 120000;
   const MAX_KEYS = 50;
   const MAX_DEPTH = 4;
@@ -12,18 +12,23 @@
 
   const state = {
     captures: [],
-    originalFetch: window.fetch,
+    originalFetch: typeof window.fetch === 'function' ? window.fetch : null,
     hooked: false,
+    hookBlocked: false,
+    hookError: '',
     originalTraceExport: null,
     originalTraceCopy: null,
-    originalTraceGetStatus: null
+    originalTraceGetStatus: null,
+    patchedTrace: false
   };
 
   function active() {
     try {
-      if (window.NovaTraceNetwork && typeof window.NovaTraceNetwork.isActive === 'function') return window.NovaTraceNetwork.isActive();
+      if (window.NovaTraceNetwork && typeof window.NovaTraceNetwork.isActive === 'function') {
+        return window.NovaTraceNetwork.isActive();
+      }
       return localStorage.getItem('nova.trace.active') === 'true';
-    } catch (error) {
+    } catch (_) {
       return false;
     }
   }
@@ -41,7 +46,7 @@
       const url = new URL(String(rawUrl || ''), location.href);
       const queryKeys = [];
       const safeParams = [];
-      url.searchParams.forEach((value, key) => {
+      url.searchParams.forEach((_value, key) => {
         if (!queryKeys.includes(key)) queryKeys.push(key);
         safeParams.push(encodeURIComponent(key) + '=<redacted>');
       });
@@ -52,33 +57,18 @@
         path: url.pathname,
         queryKeys
       };
-    } catch (error) {
+    } catch (_) {
       const fallback = clean(rawUrl).slice(0, 500);
       return { url: fallback, origin: '', host: '', path: fallback, queryKeys: [] };
     }
   }
 
-  function looksLike(value, type) {
-    if (type === 'uuid') return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-    if (type === 'url') return /^https?:\/\//i.test(value);
-    if (type === 'iso-date') return /^\d{4}-\d{2}-\d{2}T/.test(value);
-    if (type === 'id') return /^[A-Za-z0-9_-]{12,}$/.test(value);
-    return false;
-  }
-
   function describe(value, depth = 0, seen = new WeakSet()) {
     if (value === null) return { type: 'null' };
     if (value === undefined) return { type: 'undefined' };
-    const type = typeof value;
 
-    if (type === 'string') {
-      const hints = [];
-      if (looksLike(value, 'uuid')) hints.push('uuid');
-      if (looksLike(value, 'url')) hints.push('url');
-      if (looksLike(value, 'iso-date')) hints.push('iso-date');
-      if (looksLike(value, 'id')) hints.push('id-like');
-      return { type: 'string', length: value.length, hints };
-    }
+    const type = typeof value;
+    if (type === 'string') return { type: 'string', length: value.length };
     if (type === 'number') return { type: 'number', finite: Number.isFinite(value) };
     if (type === 'boolean') return { type: 'boolean' };
     if (type !== 'object') return { type };
@@ -102,6 +92,7 @@
         shape[key] = describe(value[key], depth + 1, seen);
       });
     }
+
     return {
       type: 'object',
       keyCount: keys.length,
@@ -114,17 +105,12 @@
   function jsonShapeFromText(text) {
     const trimmed = String(text || '').trim();
     if (!trimmed) return { captured: true, bodyType: 'empty', textLength: 0 };
-    if (trimmed.length > MAX_TEXT_CHARS) return { captured: false, reason: 'too-large', textLength: trimmed.length };
-
-    if (!/^[\[{]/.test(trimmed)) {
-      return {
-        captured: true,
-        bodyType: 'text',
-        textLength: trimmed.length,
-        lineCount: trimmed.split(/\r?\n/).length
-      };
+    if (trimmed.length > MAX_TEXT_CHARS) {
+      return { captured: false, reason: 'too-large', textLength: trimmed.length };
     }
-
+    if (!/^[\[{]/.test(trimmed)) {
+      return { captured: true, bodyType: 'text', textLength: trimmed.length };
+    }
     try {
       const parsed = JSON.parse(trimmed);
       return {
@@ -148,10 +134,18 @@
     if (body === undefined || body === null) return null;
     try {
       if (typeof body === 'string') return { source: 'init.body.string', ...jsonShapeFromText(body) };
-      if (body instanceof URLSearchParams) return { source: 'init.body.urlsearchparams', keys: Array.from(body.keys()).slice(0, MAX_KEYS) };
-      if (typeof FormData !== 'undefined' && body instanceof FormData) return { source: 'init.body.formdata', keys: Array.from(body.keys()).slice(0, MAX_KEYS) };
-      if (typeof Blob !== 'undefined' && body instanceof Blob) return { source: 'init.body.blob', size: body.size, mimeType: body.type || '' };
-      if (body instanceof ArrayBuffer) return { source: 'init.body.arraybuffer', byteLength: body.byteLength };
+      if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) {
+        return { source: 'init.body.urlsearchparams', keys: Array.from(body.keys()).slice(0, MAX_KEYS) };
+      }
+      if (typeof FormData !== 'undefined' && body instanceof FormData) {
+        return { source: 'init.body.formdata', keys: Array.from(body.keys()).slice(0, MAX_KEYS) };
+      }
+      if (typeof Blob !== 'undefined' && body instanceof Blob) {
+        return { source: 'init.body.blob', size: body.size, mimeType: body.type || '' };
+      }
+      if (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer) {
+        return { source: 'init.body.arraybuffer', byteLength: body.byteLength };
+      }
       if (typeof body === 'object') return { source: 'init.body.object', shape: describe(body) };
     } catch (error) {
       return { source: 'init.body.unknown', captured: false, error: error.message };
@@ -160,7 +154,9 @@
   }
 
   async function fetchBodyShape(input, init = {}) {
-    if (init && Object.prototype.hasOwnProperty.call(init, 'body')) return syncBodyShape(init.body);
+    if (init && Object.prototype.hasOwnProperty.call(init, 'body')) {
+      return syncBodyShape(init.body);
+    }
 
     try {
       if (typeof Request !== 'undefined' && input instanceof Request) {
@@ -202,25 +198,46 @@
       requestBody
     };
     state.captures.push(capture);
-    if (state.captures.length > MAX_LOGS) state.captures.splice(0, state.captures.length - MAX_LOGS);
-    console.log('[Nova API Body Catcher]', capture);
+    if (state.captures.length > MAX_LOGS) {
+      state.captures.splice(0, state.captures.length - MAX_LOGS);
+    }
     return capture;
   }
 
   function hookFetch() {
-    if (!window.fetch || window.fetch.__novaApiBodyCatcherHooked) return;
-    state.originalFetch = window.fetch;
+    if (state.hooked || state.hookBlocked) return state.hooked;
+    if (typeof window.fetch !== 'function') return false;
+    if (window.fetch.__novaApiBodyCatcherHooked) {
+      state.hooked = true;
+      return true;
+    }
 
-    window.fetch = async function novaApiBodyCatcherFetch(input, init = {}) {
+    const original = window.fetch;
+    const wrapped = async function novaApiBodyCatcherFetch(input, init = {}) {
       if (active()) {
         const meta = requestMeta(input, init || {});
         fetchBodyShape(input, init || {}).then((shape) => addCapture(meta, shape));
       }
-      return state.originalFetch.apply(this, arguments);
+      return original.apply(this, arguments);
     };
 
-    window.fetch.__novaApiBodyCatcherHooked = true;
-    state.hooked = true;
+    try {
+      wrapped.__novaApiBodyCatcherHooked = true;
+      window.fetch = wrapped;
+      if (window.fetch !== wrapped) {
+        throw new Error('fetch replacement was not accepted by the userscript sandbox');
+      }
+      state.originalFetch = original;
+      state.hooked = true;
+      state.hookError = '';
+      return true;
+    } catch (error) {
+      state.hooked = false;
+      state.hookBlocked = true;
+      state.hookError = String(error && error.message || error);
+      console.warn('[Nova API Body Catcher] Fetch hook unavailable; continuing without it:', state.hookError);
+      return false;
+    }
   }
 
   function mergeIntoApiMap(payload) {
@@ -240,20 +257,6 @@
     return payload;
   }
 
-  function copyText(text) {
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') return navigator.clipboard.writeText(text);
-    const area = document.createElement('textarea');
-    area.value = text;
-    area.setAttribute('readonly', 'readonly');
-    area.style.position = 'fixed';
-    area.style.left = '-9999px';
-    document.body.appendChild(area);
-    area.select();
-    document.execCommand('copy');
-    area.remove();
-    return Promise.resolve();
-  }
-
   function decoratePayload(payload) {
     const decorated = payload || {};
     mergeIntoApiMap(decorated);
@@ -262,6 +265,9 @@
       version: VERSION,
       note: 'Safe request body shape only. Raw body values are not exported.',
       captureCount: state.captures.length,
+      hookAvailable: state.hooked,
+      hookBlocked: state.hookBlocked,
+      hookError: state.hookError,
       captures: state.captures.slice()
     };
     if (decorated.status) decorated.status.requestBodyCaptures = state.captures.length;
@@ -272,38 +278,35 @@
     const trace = window.NovaTraceNetwork || window.NovaApiCatcher;
     if (!trace || trace.__novaApiBodyCatcherPatched) return false;
 
-    state.originalTraceExport = typeof trace.export === 'function' ? trace.export.bind(trace) : null;
-    state.originalTraceCopy = typeof trace.copy === 'function' ? trace.copy.bind(trace) : null;
-    state.originalTraceGetStatus = typeof trace.getStatus === 'function' ? trace.getStatus.bind(trace) : null;
+    try {
+      state.originalTraceExport = typeof trace.export === 'function' ? trace.export.bind(trace) : null;
+      state.originalTraceCopy = typeof trace.copy === 'function' ? trace.copy.bind(trace) : null;
+      state.originalTraceGetStatus = typeof trace.getStatus === 'function' ? trace.getStatus.bind(trace) : null;
 
-    trace.export = function novaBodyDecoratedExport(options = {}) {
-      const payload = state.originalTraceExport ? state.originalTraceExport(options) : { tool: 'Nova API Catcher', logs: [] };
-      return decoratePayload(payload);
-    };
+      trace.export = function novaBodyDecoratedExport(options = {}) {
+        const payload = state.originalTraceExport ? state.originalTraceExport(options) : { tool: 'Nova API Catcher', logs: [] };
+        return decoratePayload(payload);
+      };
 
-    trace.copy = function novaBodyDecoratedCopy(options = {}) {
-      const payload = trace.export(options);
-      copyText(JSON.stringify(payload, null, 2));
-      return payload;
-    };
+      trace.getStatus = function novaBodyDecoratedStatus() {
+        const status = state.originalTraceGetStatus ? state.originalTraceGetStatus() : {};
+        return {
+          ...status,
+          requestBodyCaptures: state.captures.length,
+          requestBodyHookAvailable: state.hooked,
+          requestBodyHookError: state.hookError
+        };
+      };
 
-    trace.getStatus = function novaBodyDecoratedStatus() {
-      const status = state.originalTraceGetStatus ? state.originalTraceGetStatus() : {};
-      return { ...status, requestBodyCaptures: state.captures.length };
-    };
-
-    trace.getRequestBodyCaptures = function getRequestBodyCaptures() {
-      return state.captures.slice();
-    };
-
-    trace.clearRequestBodyCaptures = function clearRequestBodyCaptures() {
-      state.captures = [];
-    };
-
-    trace.__novaApiBodyCatcherPatched = true;
-    window.NovaTraceNetwork = trace;
-    window.NovaApiCatcher = trace;
-    return true;
+      trace.getRequestBodyCaptures = () => state.captures.slice();
+      trace.clearRequestBodyCaptures = () => { state.captures = []; };
+      trace.__novaApiBodyCatcherPatched = true;
+      state.patchedTrace = true;
+      return true;
+    } catch (error) {
+      console.warn('[Nova API Body Catcher] Trace decoration unavailable; continuing:', error);
+      return false;
+    }
   }
 
   function clear() {
@@ -314,20 +317,25 @@
     hookFetch();
     patchTraceApi();
     setInterval(() => {
-      hookFetch();
-      patchTraceApi();
-    }, 1000);
-    console.log('[Nova API Body Catcher] Loaded', VERSION);
+      if (!state.hooked && !state.hookBlocked) hookFetch();
+      if (!state.patchedTrace) patchTraceApi();
+    }, 1500);
+    console.log('[Nova API Body Catcher] Loaded', VERSION, state.hooked ? '(fetch hooked)' : '(degraded mode)');
   }
 
   window.NovaApiBodyCatcher = {
     version: VERSION,
     init,
     clear,
-    getCaptures() {
-      return state.captures.slice();
-    },
-    decoratePayload
+    getCaptures: () => state.captures.slice(),
+    decoratePayload,
+    getStatus: () => ({
+      hooked: state.hooked,
+      hookBlocked: state.hookBlocked,
+      hookError: state.hookError,
+      patchedTrace: state.patchedTrace,
+      captureCount: state.captures.length
+    })
   };
 
   init();
