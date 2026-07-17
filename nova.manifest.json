@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "version": "2.1.0",
-  "updatedAt": "2026-07-17T11:45:00Z",
-  "bootstrapMinVersion": "2.1.0",
+  "version": "2.2.0",
+  "updatedAt": "2026-07-17T13:18:00Z",
+  "bootstrapMinVersion": "2.2.0",
   "core": [
     {"id":"nova-theme","name":"Nova Theme","description":"Shared colour, layout, RGB, and Nova Player visual-language engine.","version":"1.6.0","order":10,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js"},
     {"id":"nova-audio-theme","name":"Nova Audio Theme","description":"Reusable bass-reactive audio analyser extracted from Nova Player.","version":"0.1.0","order":20,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaAudioTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-audio-theme.js"},
