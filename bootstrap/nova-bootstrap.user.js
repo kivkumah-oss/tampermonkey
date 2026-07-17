@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      2.2.2
+// @version      2.2.3
 // @description  Install once. Nova Core, modules, updates, cache, and recovery are managed automatically from GitHub.
 // @author       Martins + Nova
 // @match        *://*/*
@@ -9,7 +9,16 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
+// @grant        GM_addValueChangeListener
+// @grant        GM_registerMenuCommand
+// @grant        unsafeWindow
 // @connect      raw.githubusercontent.com
+// @connect      studio-api-prod.suno.com
+// @connect      suno.com
+// @connect      *.suno.com
+// @connect      *.cloudfront.net
+// @connect      cdn1.suno.ai
+// @connect      cdn-o.suno.com
 // @sandbox      JavaScript
 // @run-at       document-idle
 // @noframes
@@ -23,7 +32,7 @@
   if (window.__NOVA_BOOTSTRAP_RUNNING__) return;
   window.__NOVA_BOOTSTRAP_RUNNING__ = true;
 
-  const VERSION = '2.2.2';
+  const VERSION = '2.2.3';
   const MANIFEST_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/nova.manifest.json';
   const TRUSTED_PREFIX = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/';
   const PREFIX = 'nova.bootstrap.v2.';
@@ -428,8 +437,26 @@
   function executeCode(component, code, kind = 'core') {
     const sourceName = safeId(component.id || 'nova-component') + '.js';
     try {
-      const runner = new Function(code + '\n//# sourceURL=nova://' + kind + '/' + sourceName);
-      runner.call(window);
+      const runner = new Function(
+        'GM_xmlhttpRequest',
+        'GM_getValue',
+        'GM_setValue',
+        'GM_deleteValue',
+        'GM_addValueChangeListener',
+        'GM_registerMenuCommand',
+        'unsafeWindow',
+        code + '\n//# sourceURL=nova://' + kind + '/' + sourceName
+      );
+      runner.call(
+        window,
+        typeof GM_xmlhttpRequest === 'function' ? GM_xmlhttpRequest : undefined,
+        typeof GM_getValue === 'function' ? GM_getValue : undefined,
+        typeof GM_setValue === 'function' ? GM_setValue : undefined,
+        typeof GM_deleteValue === 'function' ? GM_deleteValue : undefined,
+        typeof GM_addValueChangeListener === 'function' ? GM_addValueChangeListener : undefined,
+        typeof GM_registerMenuCommand === 'function' ? GM_registerMenuCommand : undefined,
+        typeof unsafeWindow !== 'undefined' ? unsafeWindow : window
+      );
     } catch (error) {
       const message = String(error && error.message || error);
       if (/Content Security Policy|blocked by CSP|unsafe-eval/i.test(message)) {
