@@ -1,5 +1,5 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "updatedAt": "2026-07-17",
   "modules": [
     {
@@ -73,6 +73,18 @@
       "enabled": true,
       "core": true,
       "api": "NovaMenu"
+    },
+    {
+      "id": "nova-watch",
+      "name": "Nova Watch",
+      "description": "Core-dependent live clock with Nova themes, audio-reactive glow, saved layout, settings, and gremlin messages.",
+      "version": "1.0.0",
+      "type": "module",
+      "enabled": true,
+      "autoload": true,
+      "core": false,
+      "api": "NovaWatch",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/watch/nova-watch.js"
     },
     {
       "id": "nova-suno-player",
