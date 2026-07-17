@@ -5,7 +5,7 @@
 
   if (window.NovaModuleLoader) return;
 
-  const VERSION = '1.1.0';
+  const VERSION = '1.1.1';
   const loaded = new Set();
   const loading = new Map();
 
@@ -19,6 +19,56 @@
   function matches(patterns) {
     if (!Array.isArray(patterns) || !patterns.length) return true;
     return patterns.some(matchOne);
+  }
+
+  function installEventBridge() {
+    if (typeof window.dispatchEvent === 'function') return true;
+    if (!document || typeof document.dispatchEvent !== 'function') return false;
+
+    const fallback = function novaSandboxDispatchEvent(event) {
+      return document.dispatchEvent(event);
+    };
+
+    try {
+      window.dispatchEvent = fallback;
+      if (typeof window.dispatchEvent === 'function') return true;
+    } catch (_) {}
+
+    try {
+      Object.defineProperty(window, 'dispatchEvent', {
+        value: fallback,
+        configurable: true,
+        writable: true
+      });
+      return typeof window.dispatchEvent === 'function';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function safeDispatch(type, detail) {
+    let event;
+    try {
+      event = new CustomEvent(type, { detail });
+    } catch (_) {
+      return false;
+    }
+
+    try {
+      if (typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(event);
+        return true;
+      }
+    } catch (_) {}
+
+    try {
+      if (document && typeof document.dispatchEvent === 'function') {
+        document.dispatchEvent(event);
+        return true;
+      }
+    } catch (_) {}
+
+    return false;
   }
 
   function getRegistry() {
@@ -53,9 +103,10 @@
       });
     }
 
-    window.dispatchEvent(new CustomEvent(type === 'module-loaded' ? 'nova-module-loaded' : 'nova-module-event', {
-      detail: { type, summary, data: data || {} }
-    }));
+    safeDispatch(
+      type === 'module-loaded' ? 'nova-module-loaded' : 'nova-module-event',
+      { type, summary, data: data || {} }
+    );
 
     if (window.NovaMenu && typeof window.NovaMenu.refresh === 'function') {
       setTimeout(() => window.NovaMenu.refresh(), 0);
@@ -129,6 +180,24 @@
 
         return true;
       } catch (error) {
+        if (module.api && window[module.api]) {
+          loaded.add(module.id);
+          console.warn(
+            '[Nova Module Loader] Module API is available despite a non-fatal post-init error:',
+            module.id,
+            error
+          );
+
+          emit('module-loaded', 'Nova module loaded with a sandbox compatibility warning: ' + module.id, {
+            id: module.id,
+            version: module.version || null,
+            url: module.url,
+            warning: String(error)
+          });
+
+          return true;
+        }
+
         console.warn('[Nova Module Loader] Failed', module.id, error);
         emit('module-load-error', 'Nova module failed: ' + module.id, {
           id: module.id,
@@ -158,6 +227,8 @@
     return results.filter(Boolean).length;
   }
 
+  installEventBridge();
+
   window.NovaModuleLoader = {
     version: VERSION,
     loaded,
@@ -167,6 +238,8 @@
     getRegistry,
     loadMatching,
     loadScript,
+    installEventBridge,
+    safeDispatch,
 
     async reload(module) {
       if (!module || !module.id) return false;
