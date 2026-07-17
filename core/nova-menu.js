@@ -5,7 +5,7 @@
 
   if (window.NovaMenu) return;
 
-  const VERSION = '2.3.1';
+  const VERSION = '2.3.2';
   const ORB_ID = 'nova-modules-button';
   const MENU_ID = 'nova-modules-menu';
   const STYLE_ID = 'nova-menu-style';
@@ -37,6 +37,12 @@
         return window.NovaBootstrap.getManifest();
       }
     } catch (_) {}
+
+    try {
+      const raw = document.documentElement && document.documentElement.getAttribute('data-nova-manifest');
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+
     return null;
   }
 

@@ -23,7 +23,7 @@
   if (window.__NOVA_BOOTSTRAP_RUNNING__) return;
   window.__NOVA_BOOTSTRAP_RUNNING__ = true;
 
-  const VERSION = '2.2.1';
+  const VERSION = '2.2.2';
   const MANIFEST_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/nova.manifest.json';
   const TRUSTED_PREFIX = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/';
   const PREFIX = 'nova.bootstrap.v2.';
@@ -459,6 +459,16 @@
     window.Nova.getModules = () => window.Nova.modulesRegistry.slice();
     window.Nova.getEnabledModules = () => window.Nova.modulesRegistry.filter((item) => item && item.enabled !== false);
     window.Nova.loadRegistry = async () => checkForUpdates({ force: true });
+
+    // Core files loaded by Firefox may run in a separate userscript realm.
+    // Publish the public manifest through the DOM so they share one registry.
+    try {
+      if (document.documentElement) {
+        document.documentElement.setAttribute('data-nova-manifest', JSON.stringify(manifest));
+      }
+    } catch (error) {
+      warn('Could not publish the Nova manifest bridge:', error);
+    }
   }
 
   async function loadCore(manifest) {

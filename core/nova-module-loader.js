@@ -5,7 +5,7 @@
 
   if (window.NovaModuleLoader) return;
 
-  const VERSION = '1.1.2';
+  const VERSION = '1.1.3';
   const loaded = new Set();
   const loading = new Map();
 
@@ -97,6 +97,17 @@
             ...(manifest.modules || []).map((item) => ({ ...item, core: false }))
           ];
         }
+      }
+    } catch (_) {}
+
+    try {
+      const raw = document.documentElement && document.documentElement.getAttribute('data-nova-manifest');
+      const manifest = raw && JSON.parse(raw);
+      if (manifest) {
+        return [
+          ...(manifest.core || []).map((item) => ({ ...item, core: true })),
+          ...(manifest.modules || []).map((item) => ({ ...item, core: false }))
+        ];
       }
     } catch (_) {}
 
