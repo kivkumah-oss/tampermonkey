@@ -5,18 +5,14 @@
 
   if (window.NovaModuleLoader) return;
 
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.0';
   const loaded = new Set();
   const loading = new Map();
 
   function matchOne(pattern) {
     const value = String(pattern || '');
     if (!value) return true;
-
-    if (value.endsWith('*')) {
-      return location.href.startsWith(value.slice(0, -1));
-    }
-
+    if (value.endsWith('*')) return location.href.startsWith(value.slice(0, -1));
     return location.href === value || location.href.startsWith(value);
   }
 
@@ -25,30 +21,55 @@
     return patterns.some(matchOne);
   }
 
-  function emit(type, summary, data) {
-    if (!window.NovaSession || !window.NovaSession.isActive()) return;
+  function getRegistry() {
+    try {
+      if (window.Nova && Array.isArray(window.Nova.modulesRegistry) && window.Nova.modulesRegistry.length) {
+        return window.Nova.modulesRegistry.slice();
+      }
+    } catch (_) {}
 
-    window.NovaSession.addEvent({
-      module: 'module-loader',
-      type,
-      summary,
-      data: data || {}
-    });
+    try {
+      if (window.NovaBootstrap && typeof window.NovaBootstrap.getManifest === 'function') {
+        const manifest = window.NovaBootstrap.getManifest();
+        if (manifest) {
+          return [
+            ...(manifest.core || []).map((item) => ({ ...item, core: true })),
+            ...(manifest.modules || []).map((item) => ({ ...item, core: false }))
+          ];
+        }
+      }
+    } catch (_) {}
+
+    return [];
+  }
+
+  function emit(type, summary, data) {
+    if (window.NovaSession && window.NovaSession.isActive()) {
+      window.NovaSession.addEvent({
+        module: 'module-loader',
+        type,
+        summary,
+        data: data || {}
+      });
+    }
+
+    window.dispatchEvent(new CustomEvent(type === 'module-loaded' ? 'nova-module-loaded' : 'nova-module-event', {
+      detail: { type, summary, data: data || {} }
+    }));
+
+    if (window.NovaMenu && typeof window.NovaMenu.refresh === 'function') {
+      setTimeout(() => window.NovaMenu.refresh(), 0);
+    }
   }
 
   function canLoad(module) {
     if (!module || !module.id || !module.url) return false;
-    if (module.enabled === false) return false;
-    if (module.core) return false;
-    if (!matches(module.match)) return false;
-    return true;
+    if (module.enabled === false || module.core) return false;
+    return matches(module.match);
   }
 
   async function fetchCode(module) {
-    if (
-      window.NovaBootstrap &&
-      typeof window.NovaBootstrap.fetchComponent === 'function'
-    ) {
+    if (window.NovaBootstrap && typeof window.NovaBootstrap.fetchComponent === 'function') {
       return window.NovaBootstrap.fetchComponent(module, {
         kind: 'module',
         preferCache: true
@@ -57,73 +78,64 @@
 
     const version = encodeURIComponent(module.version || 'latest');
     const joiner = module.url.includes('?') ? '&' : '?';
-    const response = await fetch(
-      module.url + joiner + 'v=' + version,
-      { cache: 'no-store' }
-    );
-
-    if (!response.ok) {
-      throw new Error('HTTP ' + response.status);
-    }
-
+    const response = await fetch(module.url + joiner + 'v=' + version, { cache: 'no-store' });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
     return response.text();
   }
 
   function execute(module, code) {
-    if (!code || typeof code !== 'string') {
-      throw new Error('Empty module source');
+    if (!code || typeof code !== 'string') throw new Error('Empty module source');
+
+    if (window.NovaBootstrap && typeof window.NovaBootstrap.executeCode === 'function') {
+      window.NovaBootstrap.executeCode(module, code, 'module');
+      return;
     }
 
     const sourceUrl = String(module.id || 'nova-module') + '.js';
-    const runner = new Function(
-      code + '\n//# sourceURL=' + sourceUrl
-    );
+    const runner = new Function(code + '\n//# sourceURL=' + sourceUrl);
+    runner.call(window);
+  }
 
-    runner();
+  function markAlreadyLoaded(module) {
+    if (module && module.api && window[module.api]) {
+      loaded.add(module.id);
+      return true;
+    }
+    return false;
   }
 
   async function loadScript(module) {
     if (!canLoad(module)) return false;
-    if (loaded.has(module.id)) return true;
+    if (loaded.has(module.id) || markAlreadyLoaded(module)) return true;
     if (loading.has(module.id)) return loading.get(module.id);
 
     const promise = (async () => {
       try {
         const code = await fetchCode(module);
         execute(module, code);
+
+        if (module.api && !window[module.api]) {
+          throw new Error('Module executed but API was not exposed: ' + module.api);
+        }
+
         loaded.add(module.id);
+        console.log('[Nova Module Loader] Loaded', module.id, module.version || 'latest');
 
-        console.log(
-          '[Nova Module Loader] Loaded',
-          module.id,
-          module.version || 'latest'
-        );
-
-        emit(
-          'module-loaded',
-          'Nova module loaded: ' + module.id,
-          {
-            id: module.id,
-            version: module.version || null,
-            url: module.url
-          }
-        );
+        emit('module-loaded', 'Nova module loaded: ' + module.id, {
+          id: module.id,
+          version: module.version || null,
+          url: module.url
+        });
 
         return true;
       } catch (error) {
         console.warn('[Nova Module Loader] Failed', module.id, error);
-
-        emit(
-          'module-load-error',
-          'Nova module failed: ' + module.id,
-          {
-            id: module.id,
-            version: module.version || null,
-            url: module.url,
-            error: String(error)
-          }
-        );
-
+        emit('module-load-error', 'Nova module failed: ' + module.id, {
+          id: module.id,
+          version: module.version || null,
+          url: module.url,
+          error: String(error)
+        });
         return false;
       } finally {
         loading.delete(module.id);
@@ -135,14 +147,8 @@
   }
 
   async function loadMatching() {
-    const modules = window.Nova && Array.isArray(window.Nova.modulesRegistry)
-      ? window.Nova.modulesRegistry
-      : [];
-
-    const autoload = modules.filter(
-      (module) => module && module.autoload === true && canLoad(module)
-    );
-
+    const registry = getRegistry();
+    const autoload = registry.filter((module) => module && module.autoload === true && canLoad(module));
     const results = [];
 
     for (const module of autoload) {
@@ -158,6 +164,7 @@
     loading,
     matches,
     canLoad,
+    getRegistry,
     loadMatching,
     loadScript,
 
@@ -165,16 +172,14 @@
       if (!module || !module.id) return false;
       loaded.delete(module.id);
 
-      if (
-        window.NovaBootstrap &&
-        typeof window.NovaBootstrap.clearComponentCache === 'function'
-      ) {
-        await window.NovaBootstrap.clearComponentCache(module);
+      if (window.NovaBootstrap && typeof window.NovaBootstrap.clearComponentCache === 'function') {
+        await window.NovaBootstrap.clearComponentCache(module, 'module');
       }
 
       return loadScript(module);
     }
   };
 
+  getRegistry().forEach(markAlreadyLoaded);
   console.log('[Nova Core] NovaModuleLoader loaded', VERSION);
 })();
