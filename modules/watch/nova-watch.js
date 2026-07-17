@@ -3,13 +3,29 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.0';
+  const VERSION = '1.0.1';
   const MODULE_ID = 'nova-watch';
   const STORAGE_KEY = 'nova.watch.integrated.v1';
   const LEGACY_STORAGE_KEY = 'novaWatch.v2';
   const WATCH_ID = 'nova-watch';
   const SETTINGS_ID = 'nova-watch-settings';
   const STYLE_ID = 'nova-watch-integrated-style';
+
+  function emitNovaEvent(type, detail = {}) {
+    try {
+      if (window.NovaEvents && typeof window.NovaEvents.emit === 'function') {
+        return window.NovaEvents.emit(type, detail);
+      }
+    } catch (_) {}
+
+    try {
+      const event = new CustomEvent(type, { detail });
+      if (typeof window.dispatchEvent === 'function') return window.dispatchEvent(event);
+      if (document && typeof document.dispatchEvent === 'function') return document.dispatchEvent(event);
+    } catch (_) {}
+
+    return false;
+  }
 
   if (window.NovaWatch) return;
 
@@ -131,9 +147,7 @@
   }
 
   function emit(type, detail = {}) {
-    window.dispatchEvent(new CustomEvent(type, {
-      detail: { module: MODULE_ID, version: VERSION, ...detail }
-    }));
+    emitNovaEvent(type, { module: MODULE_ID, version: VERSION, ...detail });
   }
 
   function sessionEvent(type, summary, data = {}) {
