@@ -5,7 +5,7 @@
 
   if (window.NovaModuleLoader) return;
 
-  const VERSION = '1.1.4';
+  const VERSION = '1.1.5';
   const loaded = new Set();
   const loading = new Map();
   const LOADED_MODULES_ATTR = 'data-nova-loaded-modules';
@@ -183,8 +183,26 @@
     }
 
     const sourceUrl = String(module.id || 'nova-module') + '.js';
-    const runner = new Function(code + '\n//# sourceURL=' + sourceUrl);
-    runner.call(window);
+    const runner = new Function(
+      'GM_xmlhttpRequest',
+      'GM_getValue',
+      'GM_setValue',
+      'GM_deleteValue',
+      'GM_addValueChangeListener',
+      'GM_registerMenuCommand',
+      'unsafeWindow',
+      code + '\n//# sourceURL=' + sourceUrl
+    );
+    runner.call(
+      window,
+      typeof GM_xmlhttpRequest === 'function' ? GM_xmlhttpRequest : undefined,
+      typeof GM_getValue === 'function' ? GM_getValue : undefined,
+      typeof GM_setValue === 'function' ? GM_setValue : undefined,
+      typeof GM_deleteValue === 'function' ? GM_deleteValue : undefined,
+      typeof GM_addValueChangeListener === 'function' ? GM_addValueChangeListener : undefined,
+      typeof GM_registerMenuCommand === 'function' ? GM_registerMenuCommand : undefined,
+      typeof unsafeWindow !== 'undefined' ? unsafeWindow : window
+    );
   }
 
   function markAlreadyLoaded(module) {
