@@ -5,7 +5,7 @@
 
   if (window.NovaModuleLoader) return;
 
-  const VERSION = '1.1.1';
+  const VERSION = '1.1.2';
   const loaded = new Set();
   const loading = new Map();
 
@@ -22,6 +22,10 @@
   }
 
   function installEventBridge() {
+    try {
+      if (window.NovaEvents && typeof window.NovaEvents.emit === 'function') return true;
+    } catch (_) {}
+
     if (typeof window.dispatchEvent === 'function') return true;
     if (!document || typeof document.dispatchEvent !== 'function') return false;
 
@@ -47,6 +51,12 @@
   }
 
   function safeDispatch(type, detail) {
+    try {
+      if (window.NovaEvents && typeof window.NovaEvents.emit === 'function') {
+        return window.NovaEvents.emit(type, detail);
+      }
+    } catch (_) {}
+
     let event;
     try {
       event = new CustomEvent(type, { detail });

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      2.2.0
+// @version      2.2.1
 // @description  Install once. Nova Core, modules, updates, cache, and recovery are managed automatically from GitHub.
 // @author       Martins + Nova
 // @match        *://*/*
@@ -23,7 +23,7 @@
   if (window.__NOVA_BOOTSTRAP_RUNNING__) return;
   window.__NOVA_BOOTSTRAP_RUNNING__ = true;
 
-  const VERSION = '2.2.0';
+  const VERSION = '2.2.1';
   const MANIFEST_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/nova.manifest.json';
   const TRUSTED_PREFIX = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/';
   const PREFIX = 'nova.bootstrap.v2.';
@@ -169,6 +169,36 @@
   function trustedUrl(url) {
     return typeof url === 'string' && url.startsWith(TRUSTED_PREFIX);
   }
+
+  // Firefox's userscript sandbox can expose a window proxy without dispatchEvent.
+  // Core and modules use this bridge so a missing window method never aborts startup.
+  function emitNovaEvent(type, detail = {}) {
+    let event;
+    try {
+      event = new CustomEvent(type, { detail });
+    } catch (_) {
+      return false;
+    }
+
+    try {
+      if (typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(event);
+        return true;
+      }
+    } catch (_) {}
+
+    try {
+      if (document && typeof document.dispatchEvent === 'function') {
+        document.dispatchEvent(event);
+        return true;
+      }
+    } catch (_) {}
+
+    return false;
+  }
+
+  window.NovaEvents = window.NovaEvents || {};
+  window.NovaEvents.emit = emitNovaEvent;
 
   function addQuery(url, key, value) {
     const joiner = url.includes('?') ? '&' : '?';
@@ -505,9 +535,11 @@
       if (current) storageSet(PREVIOUS_MANIFEST_KEY, current);
       storageSet(ACTIVE_MANIFEST_KEY, remote);
       state.updateReady = true;
-      window.dispatchEvent(new CustomEvent('nova-update-ready', {
-        detail: { currentVersion: current && current.version, nextVersion: remote.version, updatedAt: remote.updatedAt || null }
-      }));
+      emitNovaEvent('nova-update-ready', {
+        currentVersion: current && current.version,
+        nextVersion: remote.version,
+        updatedAt: remote.updatedAt || null
+      });
       log('Nova update', remote.version, 'downloaded. It activates on next refresh.');
       return remote;
     } catch (error) {
@@ -572,14 +604,12 @@
       console.log('Modules registered:', (manifest.modules || []).length);
       console.groupEnd();
 
-      window.dispatchEvent(new CustomEvent('nova-ready', {
-        detail: {
-          bootstrapVersion: VERSION,
-          manifestVersion: manifest.version,
-          source: state.manifestSource,
-          loadedCore: state.loadedCore.slice()
-        }
-      }));
+      emitNovaEvent('nova-ready', {
+        bootstrapVersion: VERSION,
+        manifestVersion: manifest.version,
+        source: state.manifestSource,
+        loadedCore: state.loadedCore.slice()
+      });
     } catch (error) {
       showFatal(error);
     }

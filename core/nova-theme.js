@@ -5,10 +5,26 @@
 
   if (window.NovaTheme) return;
 
-  const VERSION = '1.6.0';
+  const VERSION = '1.6.1';
   const THEME_ID = 'nova-core-theme';
   const STORE_KEY = 'nova.theme.active';
   const LEGACY_STORE_KEY = 'nova-theme';
+
+  function emitNovaEvent(type, detail = {}) {
+    try {
+      if (window.NovaEvents && typeof window.NovaEvents.emit === 'function') {
+        return window.NovaEvents.emit(type, detail);
+      }
+    } catch (_) {}
+
+    try {
+      const event = new CustomEvent(type, { detail });
+      if (typeof window.dispatchEvent === 'function') return window.dispatchEvent(event);
+      if (document && typeof document.dispatchEvent === 'function') return document.dispatchEvent(event);
+    } catch (_) {}
+
+    return false;
+  }
 
   const MODULE_THEMES = {
     default: {
@@ -558,9 +574,7 @@
       } catch (_) {}
 
       this.inject();
-      window.dispatchEvent(new CustomEvent('nova-theme-change', {
-        detail: this.current()
-      }));
+      emitNovaEvent('nova-theme-change', this.current());
       return true;
     },
 

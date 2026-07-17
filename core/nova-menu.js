@@ -5,7 +5,7 @@
 
   if (window.NovaMenu) return;
 
-  const VERSION = '2.3.0';
+  const VERSION = '2.3.1';
   const ORB_ID = 'nova-modules-button';
   const MENU_ID = 'nova-modules-menu';
   const STYLE_ID = 'nova-menu-style';
@@ -106,6 +106,25 @@
   function emit(type, summary, data) {
     if (!window.NovaSession || !window.NovaSession.isActive()) return;
     window.NovaSession.addEvent({ module: 'menu', type, summary, data: data || {} });
+  }
+
+  function listenForNovaEvent(type, handler) {
+    let attached = false;
+    try {
+      if (typeof window.addEventListener === 'function') {
+        window.addEventListener(type, handler);
+        attached = true;
+      }
+    } catch (_) {}
+
+    try {
+      if (document && typeof document.addEventListener === 'function') {
+        document.addEventListener(type, handler);
+        attached = true;
+      }
+    } catch (_) {}
+
+    return attached;
   }
 
   function injectStyle() {
@@ -542,7 +561,7 @@
   };
 
   ['nova-module-loaded', 'nova-watch-ready', 'nova-update-ready'].forEach((eventName) => {
-    window.addEventListener(eventName, () => {
+    listenForNovaEvent(eventName, () => {
       if (state.open) render();
     });
   });

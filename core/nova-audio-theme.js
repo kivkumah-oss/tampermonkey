@@ -5,9 +5,25 @@
 
   if (window.NovaAudioTheme) return;
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.1.1';
   const STYLE_ID = 'nova-audio-theme-core-style';
   const STORE_KEY = 'nova.audioTheme.settings';
+
+  function emitNovaEvent(type, detail = {}) {
+    try {
+      if (window.NovaEvents && typeof window.NovaEvents.emit === 'function') {
+        return window.NovaEvents.emit(type, detail);
+      }
+    } catch (_) {}
+
+    try {
+      const event = new CustomEvent(type, { detail });
+      if (typeof window.dispatchEvent === 'function') return window.dispatchEvent(event);
+      if (document && typeof document.dispatchEvent === 'function') return document.dispatchEvent(event);
+    } catch (_) {}
+
+    return false;
+  }
 
   const DEFAULT_SETTINGS = {
     enabled: true,
@@ -139,9 +155,7 @@
 
   function saveSettings() {
     writeJson(STORE_KEY, state.settings);
-    window.dispatchEvent(new CustomEvent('nova-audio-theme-settings-change', {
-      detail: clone(state.settings)
-    }));
+    emitNovaEvent('nova-audio-theme-settings-change', clone(state.settings));
   }
 
   function injectStyle() {
@@ -335,9 +349,7 @@
       }
     }
 
-    window.dispatchEvent(new CustomEvent('nova-audio-theme-frame', {
-      detail: clone(result.metrics)
-    }));
+    emitNovaEvent('nova-audio-theme-frame', clone(result.metrics));
   }
 
   function resetFrame() {
