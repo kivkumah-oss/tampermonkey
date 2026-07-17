@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      2.0.0
-// @description  Install once. Nova Core, modules, updates, and cache are managed automatically from GitHub.
+// @version      2.1.0
+// @description  Install once. Nova Core, modules, updates, cache, and recovery are managed automatically from GitHub.
 // @author       Martins + Nova
 // @match        *://*/*
 // @grant        GM_xmlhttpRequest
@@ -22,7 +22,7 @@
   if (window.__NOVA_BOOTSTRAP_RUNNING__) return;
   window.__NOVA_BOOTSTRAP_RUNNING__ = true;
 
-  const BOOTSTRAP_VERSION = '2.0.0';
+  const BOOTSTRAP_VERSION = '2.1.0';
   const MANIFEST_URL =
     'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/nova.manifest.json';
   const TRUSTED_PREFIX =
@@ -33,7 +33,9 @@
   const CACHE_INDEX_KEY = STORAGE_PREFIX + 'cache.index';
   const LAST_CHECK_KEY = STORAGE_PREFIX + 'lastCheckAt';
   const UPDATE_CHECK_MS = 15 * 60 * 1000;
-  const MAX_CACHE_ENTRIES = 60;
+  const MAX_CACHE_ENTRIES = 70;
+  const STAGE_CONCURRENCY = 4;
+  const HUD_ID = 'nova-bootstrap-status';
 
   const bootState = {
     phase: 'starting',
@@ -53,6 +55,91 @@
 
   function warn(...args) {
     console.warn('[Nova Bootstrap]', ...args);
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function mountHud() {
+    let hud = document.getElementById(HUD_ID);
+    if (hud) return hud;
+
+    hud = document.createElement('div');
+    hud.id = HUD_ID;
+    hud.style.cssText = [
+      'position:fixed',
+      'right:14px',
+      'bottom:14px',
+      'z-index:2147483647',
+      'width:min(360px,calc(100vw - 28px))',
+      'padding:11px 12px',
+      'box-sizing:border-box',
+      'border:1px solid rgba(34,211,238,.62)',
+      'border-radius:14px',
+      'background:rgba(7,9,18,.96)',
+      'color:#fff',
+      'box-shadow:0 0 24px rgba(34,211,238,.28),0 14px 45px rgba(0,0,0,.48)',
+      'font:12px/1.4 Arial,sans-serif',
+      'pointer-events:auto'
+    ].join(';');
+
+    const parent = document.body || document.documentElement;
+    parent.appendChild(hud);
+    return hud;
+  }
+
+  function updateHud(title, detail, progress, mode = 'loading') {
+    const hud = mountHud();
+    const pct = Math.max(0, Math.min(100, Number(progress) || 0));
+    const colour =
+      mode === 'error' ? '#ff7070' :
+      mode === 'ready' ? '#79ff91' :
+      mode === 'offline' ? '#ffd166' :
+      '#67e8f9';
+
+    hud.style.borderColor =
+      mode === 'error' ? 'rgba(255,70,70,.78)' :
+      mode === 'ready' ? 'rgba(80,255,112,.66)' :
+      mode === 'offline' ? 'rgba(255,193,60,.66)' :
+      'rgba(34,211,238,.62)';
+
+    hud.style.boxShadow =
+      mode === 'error'
+        ? '0 0 26px rgba(255,0,0,.34),0 14px 45px rgba(0,0,0,.48)'
+        : mode === 'ready'
+          ? '0 0 25px rgba(70,255,100,.28),0 14px 45px rgba(0,0,0,.48)'
+          : '0 0 24px rgba(34,211,238,.28),0 14px 45px rgba(0,0,0,.48)';
+
+    hud.innerHTML = `
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+        <b style="color:${colour};letter-spacing:.04em;">${escapeHtml(title)}</b>
+        <span style="color:#9ca3af;font-size:10px;">v${BOOTSTRAP_VERSION}</span>
+      </div>
+      <div style="margin-top:5px;color:#d1d5db;">${escapeHtml(detail)}</div>
+      <div style="height:5px;margin-top:8px;border-radius:999px;background:rgba(255,255,255,.10);overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#7c4dff,#22d3ee,#39ff14,#ff8a1f,#ff2bd6);transition:width .18s ease;"></div>
+      </div>
+    `;
+
+    return hud;
+  }
+
+  function hideHudSoon(delay = 1300) {
+    window.setTimeout(() => {
+      const hud = document.getElementById(HUD_ID);
+      if (hud) {
+        hud.style.transition = 'opacity .35s ease,transform .35s ease';
+        hud.style.opacity = '0';
+        hud.style.transform = 'translateY(8px)';
+        window.setTimeout(() => hud.remove(), 420);
+      }
+    }, delay);
   }
 
   function storageGet(key, fallback = null) {
@@ -185,7 +272,6 @@
 
     manifest.core.forEach((item) => validateComponent(item, 'core'));
     (manifest.modules || []).forEach((item) => validateComponent(item, 'module'));
-
     return manifest;
   }
 
@@ -211,11 +297,10 @@
   }
 
   function touchCache(key) {
-    const now = Date.now();
     const index = readCacheIndex()
       .filter((entry) => entry && entry.key && entry.key !== key);
 
-    index.unshift({ key, touchedAt: now });
+    index.unshift({ key, touchedAt: Date.now() });
 
     while (index.length > MAX_CACHE_ENTRIES) {
       const removed = index.pop();
@@ -268,14 +353,20 @@
     const versioned = addQuery(
       component.url,
       'v',
-      component.version || (bootState.manifest && bootState.manifest.version) || 'latest'
+      component.version ||
+        (bootState.manifest && bootState.manifest.version) ||
+        'latest'
     );
+
     const url = force
       ? addQuery(versioned, 'ts', Date.now())
       : versioned;
 
     try {
-      const code = await requestText(url, Number(options.timeout) || 20000);
+      const code = await requestText(
+        url,
+        Number(options.timeout) || 20000
+      );
 
       if (!code.trim()) {
         throw new Error('Empty source for ' + component.id);
@@ -287,7 +378,13 @@
       const cached = readComponentCache(component, kind);
 
       if (cached) {
-        warn('Using cached', kind, component.id, 'after download failure:', error);
+        warn(
+          'Using cached',
+          kind,
+          component.id,
+          'after download failure:',
+          error
+        );
         return cached.code;
       }
 
@@ -318,12 +415,15 @@
     }
 
     targets.forEach(storageDelete);
-    writeCacheIndex(index.filter((entry) => !entry || !targets.has(entry.key)));
+    writeCacheIndex(
+      index.filter((entry) => !entry || !targets.has(entry.key))
+    );
     return targets.size;
   }
 
   async function clearAllCaches() {
     const index = readCacheIndex();
+
     index.forEach((entry) => {
       if (entry && entry.key) storageDelete(entry.key);
     });
@@ -336,10 +436,15 @@
   }
 
   async function downloadManifest() {
+    updateHud(
+      'Nova is waking up',
+      'Checking the GitHub manifest…',
+      8
+    );
+
     const url = addQuery(MANIFEST_URL, 'ts', Date.now());
     const text = await requestText(url, 15000);
-    const manifest = validateManifest(JSON.parse(text));
-    return manifest;
+    return validateManifest(JSON.parse(text));
   }
 
   async function stageManifest(manifest) {
@@ -348,36 +453,60 @@
       .slice()
       .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
 
-    for (const component of core) {
-      try {
-        await fetchComponent(component, {
-          kind: 'core',
-          preferCache: true
-        });
-      } catch (error) {
-        if (component.required === false) {
-          warn('Optional core failed to stage:', component.id, error);
-          continue;
-        }
+    let cursor = 0;
+    let completed = 0;
+    const failures = [];
 
-        throw new Error(
-          'Could not stage required core ' +
-          component.id +
-          ': ' +
-          (error && error.message ? error.message : String(error))
+    async function worker() {
+      while (cursor < core.length) {
+        const index = cursor;
+        cursor += 1;
+        const component = core[index];
+
+        updateHud(
+          'Preparing Nova Core',
+          'Downloading ' + component.name + '…',
+          10 + Math.round((completed / Math.max(1, core.length)) * 38)
         );
+
+        try {
+          await fetchComponent(component, {
+            kind: 'core',
+            preferCache: true
+          });
+        } catch (error) {
+          failures.push({ component, error });
+
+          if (component.required !== false) {
+            throw new Error(
+              'Could not download required Core component ' +
+              component.id +
+              ': ' +
+              (error && error.message ? error.message : String(error))
+            );
+          }
+
+          warn('Optional core failed to stage:', component.id, error);
+        } finally {
+          completed += 1;
+        }
       }
     }
 
-    return manifest;
+    const workers = Array.from(
+      { length: Math.min(STAGE_CONCURRENCY, core.length) },
+      () => worker()
+    );
+
+    await Promise.all(workers);
+    return { manifest, failures };
   }
 
   async function resolveManifest() {
     const cached = storageGet(ACTIVE_MANIFEST_KEY, null);
-    let remote = null;
 
     try {
-      remote = await downloadManifest();
+      const remote = await downloadManifest();
       storageSet(LAST_CHECK_KEY, Date.now());
 
       const changed =
@@ -394,19 +523,33 @@
         storageSet(ACTIVE_MANIFEST_KEY, remote);
       }
 
-      bootState.manifestSource = changed ? 'github-update' : 'github';
+      bootState.manifestSource =
+        changed ? 'github-update' : 'github';
       return remote;
     } catch (error) {
       warn('Manifest update check failed:', error);
 
       if (cached) {
         bootState.manifestSource = 'cache';
+        updateHud(
+          'Nova offline mode',
+          'GitHub was unavailable. Loading the last working Core…',
+          18,
+          'offline'
+        );
         return validateManifest(cached);
       }
 
       const previous = storageGet(PREVIOUS_MANIFEST_KEY, null);
+
       if (previous) {
         bootState.manifestSource = 'previous-cache';
+        updateHud(
+          'Nova recovery mode',
+          'Loading the previous working release…',
+          18,
+          'offline'
+        );
         return validateManifest(previous);
       }
 
@@ -427,7 +570,10 @@
 
     const registry = [
       ...manifest.core.map((item) => ({ ...item, core: true })),
-      ...(manifest.modules || []).map((item) => ({ ...item, core: false }))
+      ...(manifest.modules || []).map((item) => ({
+        ...item,
+        core: false
+      }))
     ];
 
     window.Nova.version = manifest.version;
@@ -455,11 +601,12 @@
       return window.Nova.modulesRegistry.slice();
     };
 
-    window.Nova.getEnabledModules = function getEnabledModules() {
-      return window.Nova.modulesRegistry.filter(
-        (module) => module && module.enabled !== false
-      );
-    };
+    window.Nova.getEnabledModules =
+      function getEnabledModules() {
+        return window.Nova.modulesRegistry.filter(
+          (module) => module && module.enabled !== false
+        );
+      };
   }
 
   async function loadCore(manifest) {
@@ -468,7 +615,16 @@
       .slice()
       .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
 
-    for (const component of core) {
+    for (let index = 0; index < core.length; index += 1) {
+      const component = core[index];
+
+      updateHud(
+        'Starting Nova Core',
+        'Loading ' + component.name +
+          ' (' + (index + 1) + '/' + core.length + ')…',
+        50 + Math.round(((index + 1) / Math.max(1, core.length)) * 43)
+      );
+
       try {
         const code = await fetchComponent(component, {
           kind: 'core',
@@ -479,7 +635,8 @@
         bootState.loadedCore.push(component.id);
 
         if (component.api) {
-          window.Nova.core[component.id] = window[component.api] || null;
+          window.Nova.core[component.id] =
+            window[component.api] || null;
         }
 
         log(
@@ -498,7 +655,12 @@
           continue;
         }
 
-        throw error;
+        throw new Error(
+          'Required Core failed: ' +
+          component.id +
+          ' — ' +
+          (error && error.message ? error.message : String(error))
+        );
       }
     }
   }
@@ -508,27 +670,40 @@
     window.Nova.core.audioTheme = window.NovaAudioTheme || null;
     window.Nova.core.session = window.NovaSession || null;
     window.Nova.core.memory = window.NovaMemory || null;
-    window.Nova.core.memoryAutoLearn = window.NovaMemoryAutoLearn || null;
+    window.Nova.core.memoryAutoLearn =
+      window.NovaMemoryAutoLearn || null;
     window.Nova.core.brain = window.NovaBrain || null;
-    window.Nova.core.traceNetwork = window.NovaTraceNetwork || null;
+    window.Nova.core.traceNetwork =
+      window.NovaTraceNetwork || null;
     window.Nova.core.apiCatcher =
-      window.NovaApiCatcher || window.NovaTraceNetwork || null;
-    window.Nova.core.apiBodyCatcher = window.NovaApiBodyCatcher || null;
-    window.Nova.core.domInspector = window.NovaDOMInspector || null;
+      window.NovaApiCatcher ||
+      window.NovaTraceNetwork ||
+      null;
+    window.Nova.core.apiBodyCatcher =
+      window.NovaApiBodyCatcher || null;
+    window.Nova.core.domInspector =
+      window.NovaDOMInspector || null;
     window.Nova.core.investigationExport =
       window.NovaInvestigationExport || null;
     window.Nova.core.menu = window.NovaMenu || null;
-    window.Nova.core.orbExtras = window.NovaOrbExtras || null;
-    window.Nova.core.memoryPanel = window.NovaMemoryPanel || null;
-    window.Nova.core.windowManager = window.NovaWindowManager || null;
-    window.Nova.core.moduleLoader = window.NovaModuleLoader || null;
+    window.Nova.core.orbExtras =
+      window.NovaOrbExtras || null;
+    window.Nova.core.memoryPanel =
+      window.NovaMemoryPanel || null;
+    window.Nova.core.windowManager =
+      window.NovaWindowManager || null;
+    window.Nova.core.moduleLoader =
+      window.NovaModuleLoader || null;
 
     window.Nova.theme = window.NovaTheme || null;
     window.Nova.audioTheme = window.NovaAudioTheme || null;
   }
 
   function startNovaServices() {
-    if (window.NovaTheme && typeof window.NovaTheme.inject === 'function') {
+    if (
+      window.NovaTheme &&
+      typeof window.NovaTheme.inject === 'function'
+    ) {
       window.NovaTheme.inject();
     }
 
@@ -539,7 +714,10 @@
       window.NovaAudioTheme.init();
     }
 
-    if (window.NovaMenu && typeof window.NovaMenu.repair === 'function') {
+    if (
+      window.NovaMenu &&
+      typeof window.NovaMenu.repair === 'function'
+    ) {
       window.NovaMenu.repair();
     }
 
@@ -564,7 +742,10 @@
       window.NovaModuleLoader.loadMatching();
     }
 
-    if (window.NovaSession && window.NovaSession.isActive()) {
+    if (
+      window.NovaSession &&
+      window.NovaSession.isActive()
+    ) {
       window.NovaSession.addEvent({
         module: 'bootstrap',
         type: 'load',
@@ -582,38 +763,45 @@
 
   async function checkForUpdates(options = {}) {
     const force = options.force === true;
-    const lastCheck = Number(storageGet(LAST_CHECK_KEY, 0)) || 0;
+    const lastCheck =
+      Number(storageGet(LAST_CHECK_KEY, 0)) || 0;
 
     if (!force && Date.now() - lastCheck < UPDATE_CHECK_MS) {
       return null;
     }
 
     try {
-      const current = storageGet(ACTIVE_MANIFEST_KEY, bootState.manifest);
+      const current =
+        storageGet(ACTIVE_MANIFEST_KEY, bootState.manifest);
       const remote = await downloadManifest();
       storageSet(LAST_CHECK_KEY, Date.now());
 
       if (
         current &&
-        manifestFingerprint(remote) === manifestFingerprint(current)
+        manifestFingerprint(remote) ===
+          manifestFingerprint(current)
       ) {
         return null;
       }
 
       await stageManifest(remote);
 
-      if (current) storageSet(PREVIOUS_MANIFEST_KEY, current);
-      storageSet(ACTIVE_MANIFEST_KEY, remote);
+      if (current) {
+        storageSet(PREVIOUS_MANIFEST_KEY, current);
+      }
 
+      storageSet(ACTIVE_MANIFEST_KEY, remote);
       bootState.updateReady = true;
 
-      window.dispatchEvent(new CustomEvent('nova-update-ready', {
-        detail: {
-          currentVersion: current && current.version,
-          nextVersion: remote.version,
-          updatedAt: remote.updatedAt || null
-        }
-      }));
+      window.dispatchEvent(
+        new CustomEvent('nova-update-ready', {
+          detail: {
+            currentVersion: current && current.version,
+            nextVersion: remote.version,
+            updatedAt: remote.updatedAt || null
+          }
+        })
+      );
 
       log(
         'Nova update',
@@ -643,46 +831,35 @@
   function showFatal(error) {
     bootState.phase = 'failed';
     bootState.lastError = String(error);
-
     console.error('[Nova Bootstrap] Fatal load failure', error);
 
-    const render = () => {
-      if (!document.body || document.getElementById('nova-bootstrap-error')) {
-        return;
-      }
+    const detail =
+      error && error.message ? error.message : String(error);
 
-      const panel = document.createElement('div');
-      panel.id = 'nova-bootstrap-error';
-      panel.style.cssText = [
-        'position:fixed',
-        'right:14px',
-        'bottom:14px',
-        'z-index:2147483647',
-        'max-width:390px',
-        'padding:12px 14px',
-        'border:1px solid rgba(255,70,70,.8)',
-        'border-radius:14px',
-        'background:rgba(28,4,8,.96)',
-        'color:#fff',
-        'box-shadow:0 0 26px rgba(255,0,0,.35)',
-        'font:12px/1.45 Arial,sans-serif'
-      ].join(';');
+    updateHud(
+      'Nova Bootstrap failed',
+      detail,
+      100,
+      'error'
+    );
 
-      panel.innerHTML =
-        '<b style="color:#ff7b7b;">Nova Bootstrap failed</b>' +
-        '<div style="margin-top:6px;color:#ffd7d7;">' +
-        String(error && error.message ? error.message : error)
-          .replaceAll('&', '&amp;')
-          .replaceAll('<', '&lt;') +
-        '</div><div style="margin-top:7px;color:#d1d5db;">' +
-        'Refresh once. If it remains, GitHub may be blocked and no cached Core is available yet.' +
-        '</div>';
-
-      document.body.appendChild(panel);
-    };
-
-    if (document.body) render();
-    else document.addEventListener('DOMContentLoaded', render, { once: true });
+    const hud = mountHud();
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.textContent = 'Retry Nova';
+    retry.style.cssText = [
+      'margin-top:9px',
+      'width:100%',
+      'padding:8px',
+      'border:1px solid rgba(255,120,120,.62)',
+      'border-radius:9px',
+      'background:rgba(120,10,20,.72)',
+      'color:#fff',
+      'font-weight:800',
+      'cursor:pointer'
+    ].join(';');
+    retry.addEventListener('click', () => location.reload());
+    hud.appendChild(retry);
   }
 
   window.NovaBootstrap = {
@@ -695,14 +872,22 @@
     checkForUpdates,
 
     getManifest() {
-      return bootState.manifest ||
-        storageGet(ACTIVE_MANIFEST_KEY, null);
+      return (
+        bootState.manifest ||
+        storageGet(ACTIVE_MANIFEST_KEY, null)
+      );
     },
 
     getStatus() {
       return JSON.parse(JSON.stringify(bootState));
     }
   };
+
+  updateHud(
+    'Nova Bootstrap started',
+    'Preparing the automatic loader…',
+    3
+  );
 
   (async () => {
     try {
@@ -718,27 +903,47 @@
       bindFriendlyCoreAliases();
 
       bootState.phase = 'services';
+      updateHud(
+        'Nova is almost ready',
+        'Starting services and modules…',
+        96
+      );
       startNovaServices();
 
       bootState.phase = 'ready';
       scheduleUpdateChecks();
+
+      updateHud(
+        'Nova Core ready',
+        bootState.loadedCore.length +
+          ' Core components loaded from ' +
+          bootState.manifestSource + '.',
+        100,
+        'ready'
+      );
+      hideHudSoon();
 
       console.group('[Nova Core] Ready');
       console.log('Bootstrap:', BOOTSTRAP_VERSION);
       console.log('Manifest:', manifest.version);
       console.log('Source:', bootState.manifestSource);
       console.log('Core loaded:', bootState.loadedCore.length);
-      console.log('Modules registered:', (manifest.modules || []).length);
+      console.log(
+        'Modules registered:',
+        (manifest.modules || []).length
+      );
       console.groupEnd();
 
-      window.dispatchEvent(new CustomEvent('nova-ready', {
-        detail: {
-          bootstrapVersion: BOOTSTRAP_VERSION,
-          manifestVersion: manifest.version,
-          source: bootState.manifestSource,
-          loadedCore: bootState.loadedCore.slice()
-        }
-      }));
+      window.dispatchEvent(
+        new CustomEvent('nova-ready', {
+          detail: {
+            bootstrapVersion: BOOTSTRAP_VERSION,
+            manifestVersion: manifest.version,
+            source: bootState.manifestSource,
+            loadedCore: bootState.loadedCore.slice()
+          }
+        })
+      );
     } catch (error) {
       showFatal(error);
     }
