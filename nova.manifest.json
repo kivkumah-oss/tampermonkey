@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2.6.3",
-  "updatedAt": "2026-07-17T21:30:00Z",
+  "version": "2.6.4",
+  "updatedAt": "2026-07-17T22:05:00Z",
   "bootstrapMinVersion": "2.2.4",
   "core": [
     {"id":"nova-theme","name":"Nova Theme","description":"Shared colour, layout, RGB, and Nova Player visual-language engine.","version":"1.6.1","order":10,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js"},
@@ -18,7 +18,7 @@
     {"id":"nova-memory-autolearn","name":"Nova Memory AutoLearn","description":"Automatic safe learning from DOM and Trace summaries into local website memory.","version":"1.0.0","order":120,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMemoryAutoLearn","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js"},
     {"id":"nova-brain","name":"Nova Brain","description":"Local pattern engine that turns DOM, Trace, and Memory summaries into grounded insights and module recommendations.","version":"1.0.0","order":130,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaBrain","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js"},
     {"id":"nova-window-manager","name":"Nova Window Manager","description":"Shared Nova window discovery and management engine.","version":"1.0.0","order":140,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaWindowManager","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js"},
-    {"id":"nova-module-loader","name":"Nova Module Loader","description":"Downloads, caches, updates, launches Nova modules, and bridges Firefox userscript sandbox events.","version":"1.1.6","order":150,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaModuleLoader","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js"}
+    {"id":"nova-module-loader","name":"Nova Module Loader","description":"Downloads, caches, updates, launches Nova modules, bridges Firefox userscript sandbox events, and mirrors modules into Bootstrap cache for document-start capture.","version":"1.1.7","order":150,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaModuleLoader","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js"}
   ],
   "modules": [
     {
