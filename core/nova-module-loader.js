@@ -5,13 +5,18 @@
 
   if (window.NovaModuleLoader) return;
 
-  const VERSION = '0.3.0';
+  const VERSION = '1.0.0';
   const loaded = new Set();
+  const loading = new Map();
 
   function matchOne(pattern) {
     const value = String(pattern || '');
     if (!value) return true;
-    if (value.endsWith('*')) return location.href.startsWith(value.slice(0, -1));
+
+    if (value.endsWith('*')) {
+      return location.href.startsWith(value.slice(0, -1));
+    }
+
     return location.href === value || location.href.startsWith(value);
   }
 
@@ -22,7 +27,13 @@
 
   function emit(type, summary, data) {
     if (!window.NovaSession || !window.NovaSession.isActive()) return;
-    window.NovaSession.addEvent({ module: 'module-loader', type, summary, data: data || {} });
+
+    window.NovaSession.addEvent({
+      module: 'module-loader',
+      type,
+      summary,
+      data: data || {}
+    });
   }
 
   function canLoad(module) {
@@ -33,39 +44,137 @@
     return true;
   }
 
+  async function fetchCode(module) {
+    if (
+      window.NovaBootstrap &&
+      typeof window.NovaBootstrap.fetchComponent === 'function'
+    ) {
+      return window.NovaBootstrap.fetchComponent(module, {
+        kind: 'module',
+        preferCache: true
+      });
+    }
+
+    const version = encodeURIComponent(module.version || 'latest');
+    const joiner = module.url.includes('?') ? '&' : '?';
+    const response = await fetch(
+      module.url + joiner + 'v=' + version,
+      { cache: 'no-store' }
+    );
+
+    if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
+    }
+
+    return response.text();
+  }
+
+  function execute(module, code) {
+    if (!code || typeof code !== 'string') {
+      throw new Error('Empty module source');
+    }
+
+    const sourceUrl = String(module.id || 'nova-module') + '.js';
+    const runner = new Function(
+      code + '\n//# sourceURL=' + sourceUrl
+    );
+
+    runner();
+  }
+
   async function loadScript(module) {
     if (!canLoad(module)) return false;
     if (loaded.has(module.id)) return true;
+    if (loading.has(module.id)) return loading.get(module.id);
 
-    try {
-      const url = module.url + (module.url.includes('?') ? '&' : '?') + 'ts=' + Date.now();
-      const response = await fetch(url, { cache: 'no-store' });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      const code = await response.text();
-      const runner = new Function(code + '\n//# sourceURL=' + module.id + '.js');
-      runner();
-      loaded.add(module.id);
-      console.log('[Nova Module Loader] Loaded', module.id);
-      emit('module-loaded', 'Nova module loaded: ' + module.id, { id: module.id, url: module.url });
-      return true;
-    } catch (error) {
-      console.warn('[Nova Module Loader] Failed', module.id, error);
-      emit('module-load-error', 'Nova module failed: ' + module.id, { id: module.id, url: module.url, error: String(error) });
-      return false;
-    }
-  }
+    const promise = (async () => {
+      try {
+        const code = await fetchCode(module);
+        execute(module, code);
+        loaded.add(module.id);
 
-  function loadMatching() {
-    const modules = window.Nova && Array.isArray(window.Nova.modulesRegistry) ? window.Nova.modulesRegistry : [];
-    let count = 0;
-    modules.forEach((module) => {
-      if (module.autoload === true) {
-        loadScript(module).then((ok) => { if (ok) count += 1; });
+        console.log(
+          '[Nova Module Loader] Loaded',
+          module.id,
+          module.version || 'latest'
+        );
+
+        emit(
+          'module-loaded',
+          'Nova module loaded: ' + module.id,
+          {
+            id: module.id,
+            version: module.version || null,
+            url: module.url
+          }
+        );
+
+        return true;
+      } catch (error) {
+        console.warn('[Nova Module Loader] Failed', module.id, error);
+
+        emit(
+          'module-load-error',
+          'Nova module failed: ' + module.id,
+          {
+            id: module.id,
+            version: module.version || null,
+            url: module.url,
+            error: String(error)
+          }
+        );
+
+        return false;
+      } finally {
+        loading.delete(module.id);
       }
-    });
-    return count;
+    })();
+
+    loading.set(module.id, promise);
+    return promise;
   }
 
-  window.NovaModuleLoader = { version: VERSION, loaded, matches, canLoad, loadMatching, loadScript };
-  console.log('[Nova Core] NovaModuleLoader loaded');
+  async function loadMatching() {
+    const modules = window.Nova && Array.isArray(window.Nova.modulesRegistry)
+      ? window.Nova.modulesRegistry
+      : [];
+
+    const autoload = modules.filter(
+      (module) => module && module.autoload === true && canLoad(module)
+    );
+
+    const results = [];
+
+    for (const module of autoload) {
+      results.push(await loadScript(module));
+    }
+
+    return results.filter(Boolean).length;
+  }
+
+  window.NovaModuleLoader = {
+    version: VERSION,
+    loaded,
+    loading,
+    matches,
+    canLoad,
+    loadMatching,
+    loadScript,
+
+    async reload(module) {
+      if (!module || !module.id) return false;
+      loaded.delete(module.id);
+
+      if (
+        window.NovaBootstrap &&
+        typeof window.NovaBootstrap.clearComponentCache === 'function'
+      ) {
+        await window.NovaBootstrap.clearComponentCache(module);
+      }
+
+      return loadScript(module);
+    }
+  };
+
+  console.log('[Nova Core] NovaModuleLoader loaded', VERSION);
 })();
