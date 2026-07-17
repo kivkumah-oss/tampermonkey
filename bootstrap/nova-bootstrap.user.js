@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      2.2.1
+// @version      2.2.2
 // @description  Install once. Nova Core, modules, updates, cache, and recovery are managed automatically from GitHub.
 // @author       Martins + Nova
 // @match        *://*/*
