@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      1.5.0
+// @version      1.6.0
 // @description  Nova Core bootstrap loader
 // @author       Nova
 // @match        *://*/*
 // @grant        none
-// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js?v=150
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js?v=160
+// @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-audio-theme.js?v=160
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js?v=150
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory.js?v=150
 // @require      https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js?v=150
@@ -28,8 +29,8 @@
   const REGISTRY_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/modules.registry.json';
 
   window.Nova = window.Nova || {};
-  window.Nova.version = '1.5.0';
-  window.Nova.build = 'mission-033-api-catcher-idle-safe';
+  window.Nova.version = '1.6.0';
+  window.Nova.build = 'mission-034-player-audio-theme-core';
   window.Nova.loadedAt = new Date().toISOString();
   window.Nova.registryUrl = REGISTRY_URL;
   window.Nova.registry = null;
@@ -37,6 +38,7 @@
 
   window.Nova.core = {
     theme: window.NovaTheme || null,
+    audioTheme: window.NovaAudioTheme || null,
     session: window.NovaSession || null,
     memory: window.NovaMemory || null,
     memoryAutoLearn: window.NovaMemoryAutoLearn || null,
@@ -53,21 +55,68 @@
     moduleLoader: window.NovaModuleLoader || null
   };
 
+  window.Nova.theme = window.NovaTheme || null;
+  window.Nova.audioTheme = window.NovaAudioTheme || null;
+
   async function loadRegistry() {
     try {
-      const response = await fetch(REGISTRY_URL + '?ts=' + Date.now(), { cache: 'no-store' });
-      if (!response.ok) throw new Error('Registry HTTP ' + response.status);
+      const response = await fetch(REGISTRY_URL + '?ts=' + Date.now(), {
+        cache: 'no-store'
+      });
+
+      if (!response.ok) {
+        throw new Error('Registry HTTP ' + response.status);
+      }
+
       const registry = await response.json();
       window.Nova.registry = registry;
-      window.Nova.modulesRegistry = Array.isArray(registry.modules) ? registry.modules : [];
-      console.log('[Nova Core] Module registry loaded', window.Nova.modulesRegistry.length, 'modules');
-      if (window.NovaMenu && typeof window.NovaMenu.refresh === 'function') window.NovaMenu.refresh();
-      if (window.NovaMemoryPanel && typeof window.NovaMemoryPanel.refresh === 'function') window.NovaMemoryPanel.refresh();
-      if (window.NovaWindowManager && typeof window.NovaWindowManager.scan === 'function') window.NovaWindowManager.scan();
-      if (window.NovaModuleLoader && typeof window.NovaModuleLoader.loadMatching === 'function') window.NovaModuleLoader.loadMatching();
-      if (window.NovaSession && window.NovaSession.isActive()) {
-        window.NovaSession.addEvent({ module: 'bootstrap', type: 'registry-load', summary: 'Nova module registry loaded', data: { count: window.Nova.modulesRegistry.length, registryVersion: registry.version || null } });
+      window.Nova.modulesRegistry = Array.isArray(registry.modules)
+        ? registry.modules
+        : [];
+
+      console.log(
+        '[Nova Core] Module registry loaded',
+        window.Nova.modulesRegistry.length,
+        'modules'
+      );
+
+      if (window.NovaMenu && typeof window.NovaMenu.refresh === 'function') {
+        window.NovaMenu.refresh();
       }
+
+      if (
+        window.NovaMemoryPanel &&
+        typeof window.NovaMemoryPanel.refresh === 'function'
+      ) {
+        window.NovaMemoryPanel.refresh();
+      }
+
+      if (
+        window.NovaWindowManager &&
+        typeof window.NovaWindowManager.scan === 'function'
+      ) {
+        window.NovaWindowManager.scan();
+      }
+
+      if (
+        window.NovaModuleLoader &&
+        typeof window.NovaModuleLoader.loadMatching === 'function'
+      ) {
+        window.NovaModuleLoader.loadMatching();
+      }
+
+      if (window.NovaSession && window.NovaSession.isActive()) {
+        window.NovaSession.addEvent({
+          module: 'bootstrap',
+          type: 'registry-load',
+          summary: 'Nova module registry loaded',
+          data: {
+            count: window.Nova.modulesRegistry.length,
+            registryVersion: registry.version || null
+          }
+        });
+      }
+
       return registry;
     } catch (error) {
       console.warn('[Nova Core] Failed to load module registry', error);
@@ -78,14 +127,23 @@
   }
 
   window.Nova.loadRegistry = loadRegistry;
-  window.Nova.getModules = function getModules() { return window.Nova.modulesRegistry.slice(); };
-  window.Nova.getEnabledModules = function getEnabledModules() { return window.Nova.modulesRegistry.filter((module) => module && module.enabled !== false); };
+
+  window.Nova.getModules = function getModules() {
+    return window.Nova.modulesRegistry.slice();
+  };
+
+  window.Nova.getEnabledModules = function getEnabledModules() {
+    return window.Nova.modulesRegistry.filter(
+      (module) => module && module.enabled !== false
+    );
+  };
 
   function logStatus() {
     console.group('[Nova Core] Bootstrap loaded');
     console.log('Version:', window.Nova.version);
     console.log('Build:', window.Nova.build);
     console.log('Theme:', Boolean(window.NovaTheme));
+    console.log('Audio Theme:', Boolean(window.NovaAudioTheme));
     console.log('Session:', Boolean(window.NovaSession));
     console.log('Memory:', Boolean(window.NovaMemory));
     console.log('Memory AutoLearn:', Boolean(window.NovaMemoryAutoLearn));
@@ -103,10 +161,38 @@
     console.groupEnd();
   }
 
-  if (window.NovaTheme && typeof window.NovaTheme.inject === 'function') window.NovaTheme.inject();
-  if (window.NovaMenu && typeof window.NovaMenu.repair === 'function') window.NovaMenu.repair();
-  if (window.NovaOrbExtras && typeof window.NovaOrbExtras.scan === 'function') window.NovaOrbExtras.scan();
-  if (window.NovaSession && window.NovaSession.isActive()) window.NovaSession.addEvent({ module: 'bootstrap', type: 'load', summary: 'Nova Bootstrap loaded', data: { version: window.Nova.version, pageUrl: location.href } });
+  if (window.NovaTheme && typeof window.NovaTheme.inject === 'function') {
+    window.NovaTheme.inject();
+  }
+
+  if (
+    window.NovaAudioTheme &&
+    typeof window.NovaAudioTheme.init === 'function'
+  ) {
+    window.NovaAudioTheme.init();
+  }
+
+  if (window.NovaMenu && typeof window.NovaMenu.repair === 'function') {
+    window.NovaMenu.repair();
+  }
+
+  if (window.NovaOrbExtras && typeof window.NovaOrbExtras.scan === 'function') {
+    window.NovaOrbExtras.scan();
+  }
+
+  if (window.NovaSession && window.NovaSession.isActive()) {
+    window.NovaSession.addEvent({
+      module: 'bootstrap',
+      type: 'load',
+      summary: 'Nova Bootstrap loaded',
+      data: {
+        version: window.Nova.version,
+        pageUrl: location.href,
+        audioTheme: Boolean(window.NovaAudioTheme)
+      }
+    });
+  }
+
   loadRegistry();
   logStatus();
 })();
