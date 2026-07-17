@@ -5,11 +5,12 @@
 
   if (window.NovaMenu) return;
 
-  const VERSION = '2.3.2';
+  const VERSION = '2.3.3';
   const ORB_ID = 'nova-modules-button';
   const MENU_ID = 'nova-modules-menu';
   const STYLE_ID = 'nova-menu-style';
   const POS_KEY = 'nova.orb.position';
+  const LOADED_MODULES_ATTR = 'data-nova-loaded-modules';
 
   const state = {
     open: false,
@@ -99,6 +100,16 @@
 
   function modules() {
     return registryInfo().items;
+  }
+
+  function domLoadedModules() {
+    try {
+      const raw = document.documentElement && document.documentElement.getAttribute(LOADED_MODULES_ATTR);
+      const ids = raw && JSON.parse(raw);
+      return new Set(Array.isArray(ids) ? ids : []);
+    } catch (_) {
+      return new Set();
+    }
   }
 
   function userModules() {
@@ -306,6 +317,7 @@
   function isLoaded(module) {
     if (!module) return false;
     if (module.api && window[module.api]) return true;
+    if (domLoadedModules().has(module.id)) return true;
     return Boolean(
       window.NovaModuleLoader &&
       window.NovaModuleLoader.loaded &&
@@ -448,14 +460,9 @@
 
   async function launchModule(id) {
     const mod = userModules().find((m) => m.id === id);
-    if (!mod || !window.NovaModuleLoader) return;
+    if (!mod) return;
 
-    if (isLoaded(mod) && mod.api && window[mod.api] && window[mod.api].show) {
-      window[mod.api].show();
-    } else {
-      await window.NovaModuleLoader.loadScript(mod);
-      if (mod.api && window[mod.api] && window[mod.api].show) window[mod.api].show();
-    }
+    emitNovaCommand('launch', mod.id);
 
     emit('module-launch', 'Module launched from Nova menu', { id });
     setTimeout(render, 250);
@@ -463,8 +470,15 @@
 
   function hideModule(id) {
     const mod = userModules().find((m) => m.id === id);
-    if (mod && mod.api && window[mod.api] && window[mod.api].hide) window[mod.api].hide();
+    if (!mod) return;
+    emitNovaCommand('hide', mod.id);
     setTimeout(render, 100);
+  }
+
+  function emitNovaCommand(action, id) {
+    try {
+      document.dispatchEvent(new CustomEvent('nova-module-command', { detail: { action, id } }));
+    } catch (_) {}
   }
 
   function setTheme(id) {
@@ -566,7 +580,7 @@
     repair
   };
 
-  ['nova-module-loaded', 'nova-watch-ready', 'nova-update-ready'].forEach((eventName) => {
+  ['nova-module-loaded', 'nova-module-command-result', 'nova-watch-ready', 'nova-update-ready'].forEach((eventName) => {
     listenForNovaEvent(eventName, () => {
       if (state.open) render();
     });

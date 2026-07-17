@@ -5,9 +5,28 @@
 
   if (window.NovaModuleLoader) return;
 
-  const VERSION = '1.1.3';
+  const VERSION = '1.1.4';
   const loaded = new Set();
   const loading = new Map();
+  const LOADED_MODULES_ATTR = 'data-nova-loaded-modules';
+
+  function publishLoadedModules() {
+    try {
+      if (document.documentElement) {
+        document.documentElement.setAttribute(LOADED_MODULES_ATTR, JSON.stringify([...loaded]));
+      }
+    } catch (_) {}
+  }
+
+  function markLoaded(moduleId) {
+    loaded.add(moduleId);
+    publishLoadedModules();
+  }
+
+  function markUnloaded(moduleId) {
+    loaded.delete(moduleId);
+    publishLoadedModules();
+  }
 
   function matchOne(pattern) {
     const value = String(pattern || '');
@@ -170,7 +189,7 @@
 
   function markAlreadyLoaded(module) {
     if (module && module.api && window[module.api]) {
-      loaded.add(module.id);
+      markLoaded(module.id);
       return true;
     }
     return false;
@@ -190,7 +209,7 @@
           throw new Error('Module executed but API was not exposed: ' + module.api);
         }
 
-        loaded.add(module.id);
+        markLoaded(module.id);
         console.log('[Nova Module Loader] Loaded', module.id, module.version || 'latest');
 
         emit('module-loaded', 'Nova module loaded: ' + module.id, {
@@ -202,7 +221,7 @@
         return true;
       } catch (error) {
         if (module.api && window[module.api]) {
-          loaded.add(module.id);
+          markLoaded(module.id);
           console.warn(
             '[Nova Module Loader] Module API is available despite a non-fatal post-init error:',
             module.id,
@@ -248,7 +267,25 @@
     return results.filter(Boolean).length;
   }
 
+  function handleModuleCommand(event) {
+    const detail = event && event.detail;
+    if (!detail || !detail.id || !['launch', 'hide'].includes(detail.action)) return;
+
+    const module = getRegistry().find((item) => item && item.id === detail.id);
+    if (!module || !canLoad(module)) return;
+
+    Promise.resolve(loadScript(module)).then((ok) => {
+      const api = module.api && window[module.api];
+      const method = detail.action === 'hide' ? 'hide' : 'show';
+      if (ok && api && typeof api[method] === 'function') api[method]();
+      safeDispatch('nova-module-command-result', { id: module.id, action: detail.action, ok: Boolean(ok) });
+    }).catch((error) => {
+      safeDispatch('nova-module-command-result', { id: module.id, action: detail.action, ok: false, error: String(error) });
+    });
+  }
+
   installEventBridge();
+  document.addEventListener('nova-module-command', handleModuleCommand);
 
   window.NovaModuleLoader = {
     version: VERSION,
@@ -264,7 +301,7 @@
 
     async reload(module) {
       if (!module || !module.id) return false;
-      loaded.delete(module.id);
+      markUnloaded(module.id);
 
       if (window.NovaBootstrap && typeof window.NovaBootstrap.clearComponentCache === 'function') {
         await window.NovaBootstrap.clearComponentCache(module, 'module');
@@ -275,5 +312,6 @@
   };
 
   getRegistry().forEach(markAlreadyLoaded);
+  publishLoadedModules();
   console.log('[Nova Core] NovaModuleLoader loaded', VERSION);
 })();

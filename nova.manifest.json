@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2.5.2",
-  "updatedAt": "2026-07-17T15:30:00Z",
+  "version": "2.5.3",
+  "updatedAt": "2026-07-17T15:45:00Z",
   "bootstrapMinVersion": "2.2.2",
   "core": [
     {"id":"nova-theme","name":"Nova Theme","description":"Shared colour, layout, RGB, and Nova Player visual-language engine.","version":"1.6.1","order":10,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js"},
@@ -12,13 +12,13 @@
     {"id":"nova-api-body-catcher","name":"Nova API Body Catcher","description":"Safe API response-body metadata catcher for investigations. Degrades safely when page hooks are unavailable.","version":"1.1.0","order":60,"required":false,"enabled":true,"core":true,"type":"devkit","api":"NovaApiBodyCatcher","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-api-body-catcher.js"},
     {"id":"nova-dom-inspector","name":"Nova DOM Inspector","description":"Universal page structure inspector for safe DOM metadata snapshots.","version":"1.0.0","order":70,"required":false,"enabled":true,"core":true,"type":"devkit","api":"NovaDOMInspector","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js"},
     {"id":"nova-investigation-export","name":"Nova Investigation Export","description":"AI-ready export package combining session, trace, DOM, and Nova metadata.","version":"1.0.0","order":80,"required":false,"enabled":true,"core":true,"type":"devkit","api":"NovaInvestigationExport","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js"},
-    {"id":"nova-menu","name":"Nova Menu","description":"Single movable Nova orb with Modules and Advanced views.","version":"2.3.2","order":90,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMenu","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js"},
+    {"id":"nova-menu","name":"Nova Menu","description":"Single movable Nova orb with Modules and Advanced views.","version":"2.3.3","order":90,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMenu","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js"},
     {"id":"nova-orb-extras","name":"Nova Orb Extras","description":"Extra Nova orb controls and repair helpers.","version":"1.0.0","order":100,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaOrbExtras","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-orb-extras.js"},
     {"id":"nova-memory-panel","name":"Nova Memory Panel","description":"Advanced memory panel opened from Nova Advanced.","version":"1.0.0","order":110,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMemoryPanel","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js"},
     {"id":"nova-memory-autolearn","name":"Nova Memory AutoLearn","description":"Automatic safe learning from DOM and Trace summaries into local website memory.","version":"1.0.0","order":120,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMemoryAutoLearn","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js"},
     {"id":"nova-brain","name":"Nova Brain","description":"Local pattern engine that turns DOM, Trace, and Memory summaries into grounded insights and module recommendations.","version":"1.0.0","order":130,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaBrain","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js"},
     {"id":"nova-window-manager","name":"Nova Window Manager","description":"Shared Nova window discovery and management engine.","version":"1.0.0","order":140,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaWindowManager","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js"},
-    {"id":"nova-module-loader","name":"Nova Module Loader","description":"Downloads, caches, updates, launches Nova modules, and bridges Firefox userscript sandbox events.","version":"1.1.3","order":150,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaModuleLoader","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js"}
+    {"id":"nova-module-loader","name":"Nova Module Loader","description":"Downloads, caches, updates, launches Nova modules, and bridges Firefox userscript sandbox events.","version":"1.1.4","order":150,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaModuleLoader","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js"}
   ],
   "modules": [
     {
