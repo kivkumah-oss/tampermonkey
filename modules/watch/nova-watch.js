@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.1';
+  const VERSION = '1.0.2';
   const MODULE_ID = 'nova-watch';
   const STORAGE_KEY = 'nova.watch.integrated.v1';
   const LEGACY_STORAGE_KEY = 'novaWatch.v2';
@@ -29,9 +29,24 @@
 
   if (window.NovaWatch) return;
 
+  function readManifestBridge() {
+    try {
+      const raw = document.documentElement && document.documentElement.getAttribute('data-nova-manifest');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Firefox may isolate Bootstrap globals from dynamically loaded modules.
+  // The public manifest bridge provides the version data Watch actually needs.
+  const manifest = readManifestBridge();
+  const novaCore = window.Nova || (manifest ? { version: manifest.version } : null);
+  const novaBootstrap = window.NovaBootstrap || (manifest ? { version: manifest.bootstrapMinVersion || 'bridge' } : null);
+
   const missingCore = [
-    ['Nova', window.Nova],
-    ['NovaBootstrap', window.NovaBootstrap],
+    ['Nova', novaCore],
+    ['NovaBootstrap', novaBootstrap],
     ['NovaTheme', window.NovaTheme],
     ['NovaAudioTheme', window.NovaAudioTheme],
     ['NovaModuleLoader', window.NovaModuleLoader]
@@ -414,7 +429,7 @@
   function refreshThemeLabel() {
     const current = window.NovaTheme.current();
     const label = runtime.settings.querySelector('#nova-watch-theme-name');
-    label.textContent = `Theme: ${current.theme.name} · Core ${window.Nova.version}`;
+    label.textContent = `Theme: ${current.theme.name} · Core ${novaCore.version}`;
   }
 
   function setMode(mode, message) {
@@ -610,8 +625,8 @@
     getState: () => ({ ...state, mode: runtime.mode }),
     getElement: () => runtime.watch,
     getRequirements: () => ({
-      bootstrap: window.NovaBootstrap.version,
-      core: window.Nova.version,
+      bootstrap: novaBootstrap.version,
+      core: novaCore.version,
       theme: window.NovaTheme.version,
       audioTheme: window.NovaAudioTheme.version,
       moduleLoader: window.NovaModuleLoader.version

@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2.5.3",
-  "updatedAt": "2026-07-17T15:45:00Z",
+  "version": "2.5.4",
+  "updatedAt": "2026-07-17T16:00:00Z",
   "bootstrapMinVersion": "2.2.2",
   "core": [
     {"id":"nova-theme","name":"Nova Theme","description":"Shared colour, layout, RGB, and Nova Player visual-language engine.","version":"1.6.1","order":10,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js"},
@@ -25,7 +25,7 @@
       "id": "nova-watch",
       "name": "Nova Watch",
       "description": "Core-dependent live clock with Nova themes, audio-reactive glow, saved layout, settings, and gremlin messages.",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "type": "module",
       "enabled": true,
       "autoload": true,
