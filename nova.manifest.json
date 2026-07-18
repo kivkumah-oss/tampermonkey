@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2.6.8",
-  "updatedAt": "2026-07-18T00:05:00Z",
+  "version": "2.6.9",
+  "updatedAt": "2026-07-18T00:20:00Z",
   "bootstrapMinVersion": "2.2.4",
   "core": [
     {"id":"nova-theme","name":"Nova Theme","description":"Shared colour, layout, RGB, and Nova Player visual-language engine.","version":"1.6.1","order":10,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js"},
@@ -12,6 +12,7 @@
     {"id":"nova-api-body-catcher","name":"Nova API Body Catcher","description":"Safe API response-body metadata catcher for investigations. Degrades safely when page hooks are unavailable.","version":"1.1.0","order":60,"required":false,"enabled":true,"core":true,"type":"devkit","api":"NovaApiBodyCatcher","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-api-body-catcher.js"},
     {"id":"nova-dom-inspector","name":"Nova DOM Inspector","description":"Universal page structure inspector for safe DOM metadata snapshots.","version":"1.0.0","order":70,"required":false,"enabled":true,"core":true,"type":"devkit","api":"NovaDOMInspector","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js"},
     {"id":"nova-investigation-export","name":"Nova Investigation Export","description":"AI-ready export package combining session, trace, DOM, and Nova metadata.","version":"1.0.0","order":80,"required":false,"enabled":true,"core":true,"type":"devkit","api":"NovaInvestigationExport","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js"},
+    {"id":"nova-youtube-music-adapter","name":"Nova YouTube Music Adapter","description":"Guaranteed core-side YouTube Music state and command bridge for cross-tab remote control.","version":"1.0.0","order":85,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaYouTubeMusicAdapter","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-youtube-music-adapter.js"},
     {"id":"nova-menu","name":"Nova Menu","description":"Single movable Nova orb with Modules and Advanced views.","version":"2.3.4","order":90,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMenu","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js"},
     {"id":"nova-menu-scroll-guard","name":"Nova Menu Scroll Guard","description":"Preserves the Advanced and Modules scroll position at Nova Menu's render boundary.","version":"1.1.0","order":95,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMenuScrollGuard","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu-scroll-guard.js"},
     {"id":"nova-orb-extras","name":"Nova Orb Extras","description":"Extra Nova orb controls and repair helpers.","version":"1.0.0","order":100,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaOrbExtras","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-orb-extras.js"},
