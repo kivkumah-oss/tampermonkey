@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2.6.7",
-  "updatedAt": "2026-07-17T23:05:00Z",
+  "version": "2.6.8",
+  "updatedAt": "2026-07-18T00:05:00Z",
   "bootstrapMinVersion": "2.2.4",
   "core": [
     {"id":"nova-theme","name":"Nova Theme","description":"Shared colour, layout, RGB, and Nova Player visual-language engine.","version":"1.6.1","order":10,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js"},
@@ -34,6 +34,19 @@
       "api": "NovaWatch",
       "requires": ["NovaBootstrap", "NovaTheme", "NovaAudioTheme", "NovaModuleLoader"],
       "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/watch/nova-watch.js"
+    },
+    {
+      "id": "nova-youtube-music-remote",
+      "name": "Nova YouTube Music Remote",
+      "description": "Cross-tab YouTube Music remote with playback controls, artwork, progress, volume, shuffle, and repeat.",
+      "version": "0.1.0",
+      "type": "module",
+      "enabled": true,
+      "autoload": true,
+      "core": false,
+      "api": "NovaYouTubeMusicRemote",
+      "manualAnywhere": true,
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/youtube-music/nova-youtube-music-remote.js"
     },
     {
       "id": "nova-suno-prime-fallback",
