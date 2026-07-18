@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "version": "2.6.9",
-  "updatedAt": "2026-07-18T00:20:00Z",
-  "bootstrapMinVersion": "2.2.4",
+  "version": "2.6.10",
+  "updatedAt": "2026-07-18T06:10:00Z",
+  "bootstrapMinVersion": "2.2.5",
   "core": [
     {"id":"nova-theme","name":"Nova Theme","description":"Shared colour, layout, RGB, and Nova Player visual-language engine.","version":"1.6.1","order":10,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js"},
     {"id":"nova-audio-theme","name":"Nova Audio Theme","description":"Reusable bass-reactive audio analyser extracted from Nova Player.","version":"0.1.1","order":20,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaAudioTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-audio-theme.js"},
@@ -23,58 +23,9 @@
     {"id":"nova-module-loader","name":"Nova Module Loader","description":"Downloads, caches, updates, launches Nova modules, bridges Firefox userscript sandbox events, and mirrors modules into Bootstrap cache for document-start capture.","version":"1.1.7","order":150,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaModuleLoader","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js"}
   ],
   "modules": [
-    {
-      "id": "nova-watch",
-      "name": "Nova Watch",
-      "description": "Core-dependent live clock with Nova themes, audio-reactive glow, saved layout, settings, and gremlin messages.",
-      "version": "1.0.2",
-      "type": "module",
-      "enabled": true,
-      "autoload": true,
-      "core": false,
-      "api": "NovaWatch",
-      "requires": ["NovaBootstrap", "NovaTheme", "NovaAudioTheme", "NovaModuleLoader"],
-      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/watch/nova-watch.js"
-    },
-    {
-      "id": "nova-youtube-music-remote",
-      "name": "Nova YouTube Music Remote",
-      "description": "Cross-tab YouTube Music remote with playback controls, artwork, progress, volume, shuffle, and repeat.",
-      "version": "0.1.0",
-      "type": "module",
-      "enabled": true,
-      "autoload": true,
-      "core": false,
-      "api": "NovaYouTubeMusicRemote",
-      "manualAnywhere": true,
-      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/youtube-music/nova-youtube-music-remote.js"
-    },
-    {
-      "id": "nova-suno-prime-fallback",
-      "name": "Nova Suno Prime Fallback",
-      "description": "Active authenticated Suno feed capture used only inside Prime popup windows when passive page interception misses the request.",
-      "version": "0.1.0",
-      "type": "module",
-      "enabled": true,
-      "autoload": true,
-      "core": false,
-      "api": "NovaSunoPrimeFallback",
-      "match": ["https://suno.com/*"],
-      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-prime-fallback.js"
-    },
-    {
-      "id": "nova-suno-remote-any-page",
-      "name": "Nova Suno Remote",
-      "description": "Personal Suno library remote with full-library Prime capture, remote playback, lyrics reader, RGB Lab, and audio-reactive UI.",
-      "version": "0.1.152",
-      "type": "module",
-      "enabled": true,
-      "autoload": true,
-      "core": false,
-      "api": "NovaSunoRemoteAnyPage",
-      "manualAnywhere": true,
-      "match": ["https://suno.com/*"],
-      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-remote-any-page.js"
-    }
+    {"id":"nova-watch","name":"Nova Watch","description":"Core-dependent live clock with Nova themes, audio-reactive glow, saved layout, settings, and gremlin messages.","version":"1.0.2","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaWatch","requires":["NovaBootstrap","NovaTheme","NovaAudioTheme","NovaModuleLoader"],"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/watch/nova-watch.js"},
+    {"id":"nova-youtube-music-remote","name":"Nova YouTube Music Remote","description":"Cross-tab YouTube Music remote with playback controls, artwork, progress, volume, shuffle, and repeat.","version":"0.1.0","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaYouTubeMusicRemote","manualAnywhere":true,"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/youtube-music/nova-youtube-music-remote.js"},
+    {"id":"nova-suno-prime-fallback","name":"Nova Suno Prime Fallback","description":"Active authenticated Suno feed capture used only inside Prime popup windows when passive page interception misses the request.","version":"0.1.0","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaSunoPrimeFallback","match":["https://suno.com/*"],"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-prime-fallback.js"},
+    {"id":"nova-suno-remote-any-page","name":"Nova Suno Remote","description":"Personal Suno library remote with full-library Prime capture, remote playback, lyrics reader, RGB Lab, and audio-reactive UI.","version":"0.1.152","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaSunoRemoteAnyPage","manualAnywhere":true,"match":["https://suno.com/*"],"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-remote-any-page.js"}
   ]
 }
