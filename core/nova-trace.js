@@ -4,7 +4,7 @@
 
   if (window.NovaTraceNetwork) return;
 
-  const VERSION = '0.5.1-idle-safe';
+  const VERSION = '0.5.2-prime-safe';
   const TRACE_ACTIVE_KEY = 'nova.trace.active';
   const TRACE_STARTED_AT_KEY = 'nova.trace.startedAt';
   const TRACE_PAGE_COUNT_KEY = 'nova.trace.pageCount';
@@ -55,6 +55,18 @@
 
   function now() {
     return new Date().toISOString();
+  }
+
+  // Prime popups run in Firefox's userscript bridge. Do not inspect their
+  // cross-realm requests: Suno's own request must always win over telemetry.
+  function isSunoPrimePopup() {
+    try {
+      const host = String(location.hostname || '').toLowerCase();
+      return (host === 'suno.com' || host.endsWith('.suno.com')) &&
+        new URLSearchParams(location.search || '').has('nova_suno_prime');
+    } catch (_) {
+      return false;
+    }
   }
 
   function cleanText(value) {
@@ -266,11 +278,21 @@
   }
 
   function requestInfo(source, input, init = {}) {
-    const rawUrl = typeof input === 'string' ? input : input && input.url ? input.url : String(input || '');
+    let rawUrl = '';
+    let method = 'GET';
+    let inputHeaders = { names: [], redacted: [] };
+    let initHeaders = { names: [], redacted: [] };
+
+    try {
+      rawUrl = typeof input === 'string' ? input : input && input.url ? input.url : '';
+      method = String(init.method || (input && input.method) || 'GET').toUpperCase();
+      inputHeaders = input && input.headers ? headerInfo(input.headers) : inputHeaders;
+      initHeaders = headerInfo(init && init.headers);
+    } catch (_) {
+      // Firefox can deny property reads for Request objects crossing realms.
+    }
+
     const url = safeUrl(rawUrl);
-    const method = String(init.method || (input && input.method) || 'GET').toUpperCase();
-    const inputHeaders = input && input.headers ? headerInfo(input.headers) : { names: [], redacted: [] };
-    const initHeaders = headerInfo(init.headers);
     const headerNames = Array.from(new Set([...(inputHeaders.names || []), ...(initHeaders.names || [])]));
     const redactedHeaderNames = Array.from(new Set([...(inputHeaders.redacted || []), ...(initHeaders.redacted || [])]));
 
@@ -286,7 +308,7 @@
       sameOrigin: url.sameOrigin,
       requestHeaders: headerNames,
       redactedRequestHeaders: redactedHeaderNames,
-      requestBody: requestBodyShape(init.body)
+      requestBody: requestBodyShape(init && init.body)
     };
   }
 
@@ -336,9 +358,15 @@
     if (!window.fetch || window.fetch.__novaApiCatcherHooked) return;
 
     window.fetch = async function novaApiCatcherFetch(input, init = {}) {
-      if (!state.enabled) return state.originalFetch.apply(this, arguments);
+      if (!state.enabled || isSunoPrimePopup()) return state.originalFetch.apply(this, arguments);
 
-      const info = requestInfo('fetch', input, init || {});
+      let info;
+      try {
+        info = requestInfo('fetch', input, init || {});
+      } catch (_) {
+        // Observation is optional. A page request must still be sent.
+        return state.originalFetch.apply(this, arguments);
+      }
       const started = performance.now();
 
       add('api-request', info);
@@ -377,7 +405,7 @@
     if (XMLHttpRequest.prototype.open.__novaApiCatcherHooked) return;
 
     XMLHttpRequest.prototype.open = function novaApiCatcherXhrOpen(method, url) {
-      if (!state.enabled) {
+      if (!state.enabled || isSunoPrimePopup()) {
         this.__novaApiCatcher = null;
         return state.originalXhrOpen.apply(this, arguments);
       }
@@ -414,7 +442,7 @@
     };
 
     XMLHttpRequest.prototype.send = function novaApiCatcherXhrSend(body) {
-      if (!state.enabled) return state.originalXhrSend.apply(this, arguments);
+      if (!state.enabled || isSunoPrimePopup()) return state.originalXhrSend.apply(this, arguments);
 
       const trace = this.__novaApiCatcher || requestInfo('xhr', 'unknown', {});
       trace.started = performance.now();

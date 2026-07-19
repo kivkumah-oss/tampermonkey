@@ -4,7 +4,7 @@
 
   if (window.NovaApiBodyCatcher) return;
 
-  const VERSION = '0.2.0-sandbox-safe';
+  const VERSION = '0.2.1-prime-safe';
   const MAX_TEXT_CHARS = 120000;
   const MAX_KEYS = 50;
   const MAX_DEPTH = 4;
@@ -35,6 +35,18 @@
 
   function now() {
     return new Date().toISOString();
+  }
+
+  // The Suno Prime popup is a capture window, not an investigation target.
+  // Firefox may reject cross-realm Request property reads inside this bridge.
+  function isSunoPrimePopup() {
+    try {
+      const host = String(location.hostname || '').toLowerCase();
+      return (host === 'suno.com' || host.endsWith('.suno.com')) &&
+        new URLSearchParams(location.search || '').has('nova_suno_prime');
+    } catch (_) {
+      return false;
+    }
   }
 
   function clean(value) {
@@ -176,10 +188,17 @@
   }
 
   function requestMeta(input, init = {}) {
-    const rawUrl = typeof input === 'string' ? input : input && input.url ? input.url : String(input || '');
+    let rawUrl = '';
+    let method = 'GET';
+    try {
+      rawUrl = typeof input === 'string' ? input : input && input.url ? input.url : '';
+      method = String(init.method || (input && input.method) || 'GET').toUpperCase();
+    } catch (_) {
+      // Keep this metadata-only tool transparent to the observed page.
+    }
     const url = safeUrl(rawUrl);
     return {
-      method: String(init.method || (input && input.method) || 'GET').toUpperCase(),
+      method,
       url: url.url,
       origin: url.origin,
       host: url.host,
@@ -214,9 +233,15 @@
 
     const original = window.fetch;
     const wrapped = async function novaApiBodyCatcherFetch(input, init = {}) {
-      if (active()) {
-        const meta = requestMeta(input, init || {});
-        fetchBodyShape(input, init || {}).then((shape) => addCapture(meta, shape));
+      if (!isSunoPrimePopup() && active()) {
+        try {
+          const meta = requestMeta(input, init || {});
+          Promise.resolve(fetchBodyShape(input, init || {}))
+            .then((shape) => addCapture(meta, shape))
+            .catch(() => {});
+        } catch (_) {
+          // Capturing is optional and must never change fetch behaviour.
+        }
       }
       return original.apply(this, arguments);
     };
