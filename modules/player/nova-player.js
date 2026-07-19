@@ -4,17 +4,22 @@
   'use strict';
   if (window.NovaPlayer) return;
 
-  const VERSION = '0.1.1';
+  const VERSION = '0.2.0';
   const PANEL_ID = 'nova-player';
+  const LYRICS_ID = 'nova-ytm-lyrics';
   const STYLE_ID = 'nova-player-style';
   const STATE_KEY = 'nova.ytm.state.v1';
   const COMMAND_KEY = 'nova.ytm.command.v1';
   const POSITION_KEY = 'nova.player.position.v1';
+  const LYRICS_POSITION_KEY = 'nova.player.lyrics.position.v1';
   const SOURCE_KEY = 'nova.player.source.v1';
 
   const state = {
     visible: false,
     panel: null,
+    lyricsVisible: false,
+    lyricsPanel: null,
+    lyricsSignature: '',
     source: readLocal(SOURCE_KEY, 'youtube-music'),
     ytm: null,
     sunoMessage: 'Prime Library opens a small authenticated Suno window and captures your saved songs.',
@@ -101,6 +106,21 @@
       #${PANEL_ID} .np-times{display:flex;justify-content:space-between;color:#9ca3af;font-size:10px;margin-top:3px}
       #${PANEL_ID} .np-footer{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:11px}
       #${PANEL_ID} .np-placeholder{padding:15px;border:1px dashed rgba(168,85,247,.45);border-radius:13px;color:#c4b5fd;line-height:1.45;background:rgba(124,58,237,.08)}
+      #${LYRICS_ID}{position:fixed;z-index:2147483644;width:min(470px,calc(100vw - 24px));height:min(78vh,800px);left:24px;top:110px;background:rgba(7,9,18,.98);color:#fff;border:1px solid rgba(34,211,238,.78);border-radius:18px;box-shadow:0 0 30px rgba(34,211,238,.34),0 18px 55px rgba(0,0,0,.5);font:13px Arial,sans-serif;overflow:hidden;display:none}
+      #${LYRICS_ID} *{box-sizing:border-box}
+      #${LYRICS_ID} .np-lyrics-head{padding:11px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed,#db2777);display:flex;justify-content:space-between;align-items:center;font-weight:900;cursor:move;user-select:none}
+      #${LYRICS_ID} .np-lyrics-actions{display:flex;gap:6px}
+      #${LYRICS_ID} button{background:rgba(255,255,255,.07);color:#fff;border:1px solid rgba(34,211,238,.55);border-radius:9px;padding:7px 9px;cursor:pointer;font-weight:800}
+      #${LYRICS_ID} button:hover{background:rgba(34,211,238,.16)}
+      #${LYRICS_ID} .np-lyrics-now{margin:12px 12px 0;padding:10px;border:1px solid rgba(34,211,238,.25);border-radius:12px;background:rgba(255,255,255,.03)}
+      #${LYRICS_ID} .np-lyrics-title{font-size:15px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #${LYRICS_ID} .np-lyrics-artist{margin-top:4px;color:#b8c2d5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #${LYRICS_ID} .np-lyrics-body{margin:12px;height:calc(100% - 134px);padding:14px;border:1px solid rgba(34,211,238,.2);border-radius:12px;background:rgba(1,4,12,.65);overflow:auto;white-space:pre-wrap;line-height:1.58;color:#eef5ff}
+      #${LYRICS_ID} .np-lyrics-empty{color:#b8c2d5;line-height:1.55}
+      .nova-player-rgb #${PANEL_ID},.nova-player-rgb #${LYRICS_ID}{animation:np-rgb-pulse 7s linear infinite;border-color:#f0abfc}
+      .nova-player-rgb #${PANEL_ID} .np-head,.nova-player-rgb #${LYRICS_ID} .np-lyrics-head{background:linear-gradient(90deg,#ef4444,#f59e0b,#22c55e,#06b6d4,#8b5cf6,#ec4899);background-size:300% 100%;animation:np-rgb-flow 6s linear infinite}
+      @keyframes np-rgb-flow{to{background-position:300% 0}}
+      @keyframes np-rgb-pulse{50%{box-shadow:0 0 40px rgba(244,114,182,.55),0 18px 55px rgba(0,0,0,.5)}}
     `;
     (document.head || document.documentElement).appendChild(style);
   }
@@ -193,6 +213,98 @@
     else renderYtm(body);
   }
 
+  function currentYtmState() {
+    return state.ytm || gmGet(STATE_KEY, null) || {};
+  }
+
+  function lyricSignature(ytm) {
+    const lyrics = ytm && ytm.lyrics ? ytm.lyrics : {};
+    return [ytm.title || '', ytm.artist || '', lyrics.text || ''].join('\u0000');
+  }
+
+  function createLyricsPanel() {
+    injectStyle();
+    let panel = document.getElementById(LYRICS_ID);
+    if (panel) return panel;
+
+    panel = node('div', { id: LYRICS_ID });
+    const head = node('div', { className: 'np-lyrics-head' }, [
+      node('span', { text: 'Nova Lyrics Reader' }),
+      node('div', { className: 'np-lyrics-actions' }, [
+        node('button', { text: 'Refresh', type: 'button', dataset: { lyricsAction: 'refresh' } }),
+        node('button', { text: 'Copy', type: 'button', dataset: { lyricsAction: 'copy' } }),
+        node('button', { text: 'x', type: 'button', dataset: { lyricsAction: 'close' } })
+      ])
+    ]);
+    panel.append(head, node('div', { className: 'np-lyrics-now' }), node('div', { className: 'np-lyrics-body' }));
+    document.body.appendChild(panel);
+    restorePosition(panel, LYRICS_POSITION_KEY);
+    bindDrag(panel, head, LYRICS_POSITION_KEY);
+    panel.addEventListener('click', onLyricsClick);
+    state.lyricsPanel = panel;
+    return panel;
+  }
+
+  function renderLyrics(force = false) {
+    const panel = createLyricsPanel();
+    const ytm = currentYtmState();
+    const signature = lyricSignature(ytm);
+    if (!force && signature === state.lyricsSignature) return;
+    state.lyricsSignature = signature;
+
+    const details = panel.querySelector('.np-lyrics-now');
+    const body = panel.querySelector('.np-lyrics-body');
+    details.replaceChildren(
+      node('div', { className: 'np-lyrics-title', text: ytm.title || 'YouTube Music lyrics' }),
+      node('div', { className: 'np-lyrics-artist', text: ytm.artist || 'Open a track in YouTube Music' })
+    );
+
+    const textValue = ytm.lyrics && ytm.lyrics.text ? ytm.lyrics.text : '';
+    body.replaceChildren(textValue
+      ? node('div', { text: textValue })
+      : node('div', {
+        className: 'np-lyrics-empty',
+        text: 'No lyrics are visible yet. Nova asked YouTube Music to open its Lyrics tab. If this track has lyrics, give it a moment or press Refresh.'
+      }));
+  }
+
+  function openLyrics() {
+    state.lyricsVisible = true;
+    const panel = createLyricsPanel();
+    panel.style.display = 'block';
+    renderLyrics(true);
+    send('lyrics');
+    setTimeout(() => renderLyrics(true), 900);
+    setTimeout(() => renderLyrics(true), 2000);
+  }
+
+  function hideLyrics() {
+    state.lyricsVisible = false;
+    const panel = document.getElementById(LYRICS_ID);
+    if (panel) panel.style.display = 'none';
+  }
+
+  async function onLyricsClick(event) {
+    const button = event.target.closest('button');
+    if (!button) return;
+    const action = button.dataset.lyricsAction;
+    if (action === 'close') hideLyrics();
+    else if (action === 'refresh') {
+      send('lyrics');
+      state.lyricsSignature = '';
+      setTimeout(() => renderLyrics(true), 900);
+    } else if (action === 'copy') {
+      const ytm = currentYtmState();
+      const textValue = ytm.lyrics && ytm.lyrics.text ? ytm.lyrics.text : '';
+      if (!textValue) return;
+      try {
+        await navigator.clipboard.writeText(textValue);
+        button.textContent = 'Copied';
+        setTimeout(() => { button.textContent = 'Copy'; }, 1000);
+      } catch (_) {}
+    }
+  }
+
   async function onClick(event) {
     const button = event.target.closest('button');
     if (!button) return;
@@ -206,6 +318,7 @@
     if (action === 'close') hide();
     else if (action === 'rgb') document.body.classList.toggle('nova-player-rgb');
     else if (['previous','play-pause','next','shuffle','repeat','mute'].includes(action)) send(action);
+    else if (action === 'lyrics') openLyrics();
     else if (action === 'open-ytm') window.open('https://music.youtube.com/', '_blank');
     else if (action === 'open-suno-site') window.open('https://suno.com/me', '_blank');
     else if (action === 'open-suno') await openSunoRemote(false);
@@ -286,9 +399,9 @@
     if (type === 'volume') send('volume', Number(event.target.value));
   }
 
-  function restorePosition(panel) {
+  function restorePosition(panel, storageKey = POSITION_KEY) {
     try {
-      const pos = JSON.parse(localStorage.getItem(POSITION_KEY) || 'null');
+      const pos = JSON.parse(localStorage.getItem(storageKey) || 'null');
       if (!pos) return;
       panel.style.left = Math.max(4, Math.min(window.innerWidth - 394, Number(pos.x) || 24)) + 'px';
       panel.style.top = Math.max(4, Math.min(window.innerHeight - 90, Number(pos.y) || 110)) + 'px';
@@ -296,7 +409,7 @@
     } catch (_) {}
   }
 
-  function bindDrag(panel, head) {
+  function bindDrag(panel, head, storageKey = POSITION_KEY) {
     let dragging = false, sx = 0, sy = 0, sl = 0, st = 0;
     head.addEventListener('mousedown', (event) => {
       if (event.target.closest('button')) return;
@@ -314,13 +427,14 @@
       if (!dragging) return;
       dragging = false;
       const rect = panel.getBoundingClientRect();
-      try { localStorage.setItem(POSITION_KEY, JSON.stringify({ x: rect.left, y: rect.top })); } catch (_) {}
+      try { localStorage.setItem(storageKey, JSON.stringify({ x: rect.left, y: rect.top })); } catch (_) {}
     });
   }
 
   function poll() {
     state.ytm = gmGet(STATE_KEY, null);
     if (state.visible && state.source === 'youtube-music') render();
+    if (state.lyricsVisible) renderLyrics();
   }
 
   function show() {
@@ -341,6 +455,8 @@
     version: VERSION,
     show,
     hide,
+    showLyrics: openLyrics,
+    hideLyrics,
     toggle: () => state.visible ? hide() : show(),
     setSource(source) {
       state.source = source === 'suno' ? 'suno' : 'youtube-music';
