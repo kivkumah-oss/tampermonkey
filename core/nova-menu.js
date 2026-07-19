@@ -5,7 +5,7 @@
 
   if (window.NovaMenu) return;
 
-  const VERSION = '2.3.4';
+  const VERSION = '2.3.5';
   const ORB_ID = 'nova-modules-button';
   const MENU_ID = 'nova-modules-menu';
   const STYLE_ID = 'nova-menu-style';
@@ -117,7 +117,7 @@
   }
 
   function coreModules() {
-    return modules().filter((m) => m && (m.core || m.type === 'devkit'));
+    return modules().filter((m) => m && m.core && m.type !== 'devkit');
   }
 
   function emit(type, summary, data) {
@@ -156,7 +156,8 @@
       #${MENU_ID} button{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(34,211,238,.45);border-radius:9px;padding:7px 9px;cursor:pointer;font:700 12px Arial,sans-serif}
       #${MENU_ID} button:hover{background:rgba(34,211,238,.16)}
       #${MENU_ID} .nova-menu-head{padding:12px;background:linear-gradient(90deg,var(--nova-accent,#22d3ee),var(--nova-accent-2,#8b5cf6));display:flex;justify-content:space-between;align-items:center;font-weight:900}
-      #${MENU_ID} .nova-menu-tabs{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;gap:8px}
+      #${MENU_ID} .nova-menu-tabs{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+      #${MENU_ID} .nova-menu-tabs button{padding:7px 4px;white-space:nowrap}
       #${MENU_ID} .nova-menu-body{padding:10px;overflow:auto;max-height:min(640px,calc(100vh - 180px))}
       #${MENU_ID} .nova-card{background:rgba(255,255,255,.045);border:1px solid rgba(34,211,238,.22);border-radius:12px;padding:10px;margin-bottom:10px}
       #${MENU_ID} .nova-muted{color:#9ca3af;line-height:1.35}
@@ -434,16 +435,37 @@
   }
 
   function renderAdvanced() {
+    return sessionCard() + traceCard() + domCard() + bundleCard();
+  }
+
+  function renderSettings() {
+    return themeCard();
+  }
+
+  function renderInfo() {
     const info = registryInfo();
-    return themeCard() + sessionCard() + traceCard() + domCard() + bundleCard() + `<div class="nova-muted" style="margin:8px 0 10px;">Build: ${esc(info.build)} | Manifest: ${esc(info.version)} | Menu: ${VERSION} | Registry: ${esc(info.source)}</div>` + coreCard();
+    return `<div class="nova-card"><b style="color:#c084fc;text-transform:uppercase;letter-spacing:.06em;">Info for Nerds</b><div class="nova-muted" style="margin-top:7px;">Build: ${esc(info.build)}<br>Manifest: ${esc(info.version)}<br>Menu: ${VERSION}<br>Registry: ${esc(info.source)}</div></div>` + coreCard();
   }
 
   function render() {
     const panel = createPanel();
     if (!panel) return;
-    const isModules = state.view === 'modules';
+    const views = [
+      { id: 'settings', label: 'Settings', color: 'rgba(34,197,94,.9)' },
+      { id: 'modules', label: 'Modules', color: 'rgba(34,211,238,.9)' },
+      { id: 'advanced', label: 'Advanced', color: 'rgba(168,85,247,.9)' },
+      { id: 'info', label: 'Info', color: 'rgba(244,114,182,.9)' }
+    ];
+    const content = state.view === 'settings'
+      ? renderSettings()
+      : state.view === 'advanced'
+        ? renderAdvanced()
+        : state.view === 'info'
+          ? renderInfo()
+          : renderModules();
+    const tabs = views.map((view) => `<button data-nova-view="${view.id}" style="border-color:${state.view === view.id ? view.color : 'rgba(255,255,255,.18)'};">${view.label}</button>`).join('');
 
-    panel.innerHTML = `<div class="nova-menu-head"><span>Nova</span><button data-nova-close style="background:rgba(0,0,0,.25);border-color:rgba(255,255,255,.25);padding:4px 8px;">x</button></div><div class="nova-menu-tabs"><button data-nova-view="modules" style="border-color:${isModules ? 'rgba(34,211,238,.9)' : 'rgba(255,255,255,.18)'};">Modules</button><button data-nova-view="advanced" style="border-color:${!isModules ? 'rgba(168,85,247,.9)' : 'rgba(255,255,255,.18)'};">Advanced</button></div><div class="nova-menu-body">${isModules ? renderModules() : renderAdvanced()}</div>`;
+    panel.innerHTML = `<div class="nova-menu-head"><span>Nova</span><button data-nova-close style="background:rgba(0,0,0,.25);border-color:rgba(255,255,255,.25);padding:4px 8px;">x</button></div><div class="nova-menu-tabs">${tabs}</div><div class="nova-menu-body">${content}</div>`;
     placePanelNearOrb();
   }
 
@@ -451,7 +473,12 @@
     const target = event.target && event.target.closest ? event.target.closest('button') : null;
     if (!target) return;
     if (target.dataset.novaClose !== undefined) window.NovaMenu.hide();
-    if (target.dataset.novaView) { state.view = target.dataset.novaView; render(); }
+    if (target.dataset.novaView) {
+      state.view = target.dataset.novaView;
+      render();
+      const body = state.panel && state.panel.querySelector('.nova-menu-body');
+      if (body) body.scrollTop = 0;
+    }
     if (target.dataset.novaLaunch) launchModule(target.dataset.novaLaunch);
     if (target.dataset.novaHide) hideModule(target.dataset.novaHide);
     if (target.dataset.novaAct) advancedAction(target.dataset.novaAct);
