@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2.6.20",
-  "updatedAt": "2026-07-19T14:05:00Z",
+  "version": "2.6.21",
+  "updatedAt": "2026-07-19T14:35:00Z",
   "bootstrapMinVersion": "2.2.5",
   "core": [
     {"id":"nova-trusted-types-runtime","name":"Nova Trusted Types Runtime","description":"Bootstrap-realm Trusted Types compatibility for Nova UI on strict CSP websites.","version":"1.0.0","order":5,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTrustedTypesRuntime","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trusted-types-runtime.js"},
@@ -28,6 +28,6 @@
     {"id":"nova-watch","name":"Nova Watch","description":"Core-dependent live clock with Nova themes, audio-reactive glow, saved layout, settings, and gremlin messages.","version":"1.0.2","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaWatch","requires":["NovaBootstrap","NovaTheme","NovaAudioTheme","NovaModuleLoader"],"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/watch/nova-watch.js"},
     {"id":"nova-youtube-music-remote","name":"Nova YouTube Music Remote (Legacy)","description":"Legacy standalone YouTube Music remote retained as a fallback during Nova Player migration.","version":"0.1.0","type":"module","enabled":false,"autoload":false,"core":false,"api":"NovaYouTubeMusicRemote","manualAnywhere":true,"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/youtube-music/nova-youtube-music-remote.js"},
     {"id":"nova-suno-prime-fallback","name":"Nova Suno Prime Fallback","description":"Active authenticated Suno feed capture used only inside Prime popup windows when passive page interception misses the request.","version":"0.1.0","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaSunoPrimeFallback","match":["https://suno.com/*"],"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-prime-fallback.js"},
-    {"id":"nova-suno-remote-any-page","name":"Nova Suno Remote","description":"Personal Suno library remote retained while its adapter is migrated into Nova Player.","version":"0.1.153","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaSunoRemoteAnyPage","manualAnywhere":true,"match":["https://suno.com/*"],"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-remote-any-page.js"}
+    {"id":"nova-suno-remote-any-page","name":"Nova Suno Remote","description":"Personal Suno library remote retained while its adapter is migrated into Nova Player.","version":"0.1.154","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaSunoRemoteAnyPage","manualAnywhere":true,"match":["https://suno.com/*"],"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-remote-any-page.js"}
   ]
 }
