@@ -5,7 +5,7 @@
 
   if (window.NovaYouTubeMusicAdapter) return;
 
-  const VERSION = '1.1.0';
+  const VERSION = '1.1.1';
   const STATE_KEY = 'nova.ytm.state.v1';
   const COMMAND_KEY = 'nova.ytm.command.v1';
   const IS_YTM = location.hostname === 'music.youtube.com';
@@ -62,12 +62,27 @@
     return true;
   }
 
+  // YouTube Music nests its player panels inside several open Shadow DOM roots.
+  // A normal document.querySelector cannot see the rendered lyrics there.
+  function queryComposed(selector, root = document) {
+    const direct = root && typeof root.querySelector === 'function' ? root.querySelector(selector) : null;
+    if (direct) return direct;
+
+    const elements = root && typeof root.querySelectorAll === 'function' ? root.querySelectorAll('*') : [];
+    for (const element of elements) {
+      if (!element.shadowRoot) continue;
+      const nested = queryComposed(selector, element.shadowRoot);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
   function readLyrics() {
-    const lyricNode = first([
+    const lyricNode = queryComposed([
       'ytmusic-description-shelf-renderer yt-formatted-string.description.split-lines',
       'ytmusic-description-shelf-renderer yt-formatted-string.non-expandable.description',
       'ytmusic-description-shelf-renderer yt-formatted-string.description'
-    ]);
+    ].join(','));
     const raw = lyricNode ? String(lyricNode.innerText || lyricNode.textContent || '') : '';
     const textValue = raw
       .replace(/\r/g, '')
