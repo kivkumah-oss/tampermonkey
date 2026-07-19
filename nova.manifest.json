@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2.6.13",
-  "updatedAt": "2026-07-19T01:20:00Z",
+  "version": "2.6.14",
+  "updatedAt": "2026-07-19T01:46:00Z",
   "bootstrapMinVersion": "2.2.5",
   "core": [
     {"id":"nova-trusted-types-runtime","name":"Nova Trusted Types Runtime","description":"Bootstrap-realm Trusted Types compatibility for Nova UI on strict CSP websites.","version":"1.0.0","order":5,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTrustedTypesRuntime","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trusted-types-runtime.js"},
@@ -16,7 +16,7 @@
     {"id":"nova-youtube-music-adapter","name":"Nova YouTube Music Adapter","description":"Guaranteed core-side YouTube Music state and command bridge for cross-tab remote control.","version":"1.0.0","order":85,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaYouTubeMusicAdapter","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-youtube-music-adapter.js"},
     {"id":"nova-menu","name":"Nova Menu","description":"Single movable Nova orb with Modules and Advanced views.","version":"2.3.4","order":90,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMenu","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js"},
     {"id":"nova-menu-scroll-guard","name":"Nova Menu Scroll Guard","description":"Preserves the Advanced and Modules scroll position at Nova Menu's render boundary.","version":"1.1.0","order":95,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMenuScrollGuard","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu-scroll-guard.js"},
-    {"id":"nova-menu-devkit-gate","name":"Nova Menu DevKit Gate","description":"Collapsible theme controls and a locally unlocked private DevKit tab.","version":"1.0.0","order":97,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMenuDevKitGate","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu-devkit-gate.js"},
+    {"id":"nova-menu-devkit-gate","name":"Nova Menu DevKit and Info Tabs","description":"Collapsible themes plus dedicated DevKit and core information tabs.","version":"1.1.0","order":97,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMenuDevKitGate","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu-devkit-gate.js"},
     {"id":"nova-orb-extras","name":"Nova Orb Extras","description":"Extra Nova orb controls and repair helpers.","version":"1.0.0","order":100,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaOrbExtras","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-orb-extras.js"},
     {"id":"nova-memory-panel","name":"Nova Memory Panel","description":"Advanced memory panel opened from Nova Advanced.","version":"1.0.0","order":110,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMemoryPanel","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js"},
     {"id":"nova-memory-autolearn","name":"Nova Memory AutoLearn","description":"Automatic safe learning from DOM and Trace summaries into local website memory.","version":"1.0.0","order":120,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMemoryAutoLearn","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js"},
