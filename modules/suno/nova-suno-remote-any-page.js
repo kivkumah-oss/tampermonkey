@@ -36,7 +36,7 @@
   if (window.top !== window.self) return;
   if (window.NovaSunoRemoteAnyPage) return;
 
-  const VERSION = '0.1.154';
+  const VERSION = '0.1.155';
   const API = 'https://studio-api-prod.suno.com';
   const IS_SUNO = location.hostname === 'suno.com' || location.hostname.endsWith('.suno.com');
   const PRIME_PARAM = 'nova_suno_prime';
@@ -57,7 +57,8 @@
     fxPos: 'nova_suno_remote_fx_pos_v1',
     minimized: 'nova_suno_remote_minimized_v1',
     theme: 'nova_suno_remote_theme_v1',
-    fxSettings: 'nova_suno_remote_fx_settings_v1'
+      fxSettings: 'nova_suno_remote_fx_settings_v1',
+      embedded: 'nova_suno_remote_embedded_v1'
   };
   const TAB_ID = `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -120,7 +121,8 @@
     view: 'library',
     status: 'Ready. Load library or Prime Suno.',
     busy: false,
-    open: PRIME_MODE ? false : !Boolean(GM_getValue(STORAGE.minimized, false)),
+    embedded: Boolean(GM_getValue(STORAGE.embedded, false)),
+    open: PRIME_MODE ? false : !Boolean(GM_getValue(STORAGE.minimized, false)) && !Boolean(GM_getValue(STORAGE.embedded, false)),
     theme: GM_getValue(STORAGE.theme, 'rgb'),
     fxSettings: readFxSettings(),
     dragging: null,
@@ -686,6 +688,71 @@
   function currentClip() {
     applyFilter();
     return state.filtered[state.index] || state.library[state.index] || null;
+  }
+
+  function bridgeClip(clip) {
+    if (!clip) return null;
+    return {
+      id: clip.id || '',
+      title: clip.title || 'Untitled song',
+      imageUrl: clip.imageUrl || '',
+      prompt: clip.prompt || '',
+      model: clip.model || '',
+      tags: clip.tags || '',
+      duration: Number(clip.duration || 0),
+      audioUrl: clip.audioUrl || ''
+    };
+  }
+
+  function bridgeState() {
+    const audio = state.audio;
+    const t = audio ? Number(audio.currentTime || 0) : 0;
+    const playing = Boolean(audio && !audio.paused);
+    const bass = playing ? 0.45 + Math.max(0, Math.sin(t * 5.2)) * 0.35 : 0;
+    const mid = playing ? 0.30 + Math.max(0, Math.sin(t * 8.1 + 1.4)) * 0.28 : 0;
+    const high = playing ? 0.22 + Math.max(0, Math.sin(t * 13.7 + 0.7)) * 0.25 : 0;
+    return {
+      ready: Boolean(state.ready),
+      status: state.status || '',
+      query: state.query || '',
+      index: Number(state.index || 0),
+      currentClip: bridgeClip(currentClip()),
+      library: (state.library || []).map(bridgeClip),
+      visibleLibrary: (state.filtered && state.filtered.length ? state.filtered : state.library || []).map(bridgeClip),
+      playing,
+      currentTime: audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+      duration: audio && Number.isFinite(audio.duration) ? audio.duration : 0,
+      volume: audio && Number.isFinite(audio.volume) ? audio.volume : 1,
+      audio: { bass, mid, high, energy: Math.min(1, (bass * .5) + (mid * .28) + (high * .18)), react: Math.min(1, (bass * .3) + (mid * .22) + (high * .14)), hues: [188, 264, 322] },
+      fxSettings: state.fxSettings,
+      theme: state.theme
+    };
+  }
+
+  function setEmbedded(enabled) {
+    const active = Boolean(enabled);
+    state.embedded = active;
+    GM_setValue(STORAGE.embedded, active);
+    state.open = !active;
+    if (state.panel) state.panel.style.display = active ? 'none' : '';
+    if (state.orb) state.orb.style.display = active ? 'none' : '';
+    return bridgeState();
+  }
+
+  function setBridgeFxSettings(patch = {}) {
+    if (Object.prototype.hasOwnProperty.call(patch, 'theme')) state.theme = patch.theme === 'rgb' ? 'rgb' : 'steady';
+    ['source', 'palette', 'intensity'].forEach((key) => {
+      if (patch[key]) state.fxSettings[key] = patch[key];
+    });
+    if (patch.parts && typeof patch.parts === 'object') {
+      state.fxSettings.parts = { ...state.fxSettings.parts, ...patch.parts };
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'enabled')) state.fxSettings.enabled = Boolean(patch.enabled);
+    GM_setValue(STORAGE.theme, state.theme);
+    saveFxSettings();
+    applyFxClasses();
+    render();
+    return bridgeState();
   }
 
   async function playIndex(index) {
@@ -1528,7 +1595,7 @@
     orb.id = 'nova-suno-remote-orb';
     orb.type = 'button';
     orb.textContent = 'Nova Music';
-    if (PRIME_MODE) orb.style.display = 'none';
+    if (PRIME_MODE || state.embedded) orb.style.display = 'none';
     orb.addEventListener('click', () => {
       if (state.suppressOrbClick) {
         state.suppressOrbClick = false;
@@ -2419,6 +2486,22 @@
     show: () => { state.open = true; GM_setValue(STORAGE.minimized, false); initUi(); keepUiOnTop(); render(); },
     hide: () => { state.open = false; GM_setValue(STORAGE.minimized, true); render(); },
     resetPosition: () => { GM_setValue(STORAGE.panelPos, ''); GM_setValue(STORAGE.orbPos, ''); location.reload(); },
+    // The unified Nova Player uses these methods while leaving Prime capture in this proven module.
+    getState: bridgeState,
+    embed: () => setEmbedded(true),
+    unembed: () => setEmbedded(false),
+    playIndex,
+    playNext,
+    playPrev,
+    shuffle: shufflePlay,
+    togglePlay,
+    setQuery(query) { state.query = clean(query); applyFilter(); render(); return bridgeState(); },
+    setVolume(value) {
+      const audio = ensureAudio();
+      audio.volume = Math.max(0, Math.min(1, Number(value) || 0));
+      return bridgeState();
+    },
+    setFxSettings: setBridgeFxSettings,
     debug: () => ({
       version: VERSION,
       href: location.href,

@@ -4,9 +4,10 @@
   'use strict';
   if (window.NovaPlayer) return;
 
-  const VERSION = '0.3.0';
+  const VERSION = '0.4.0';
   const PANEL_ID = 'nova-player';
   const LYRICS_ID = 'nova-ytm-lyrics';
+  const RGB_LAB_ID = 'nova-player-rgb-lab';
   const STYLE_ID = 'nova-player-style';
   const STATE_KEY = 'nova.ytm.state.v1';
   const COMMAND_KEY = 'nova.ytm.command.v1';
@@ -14,6 +15,9 @@
   const LYRICS_POSITION_KEY = 'nova.player.lyrics.position.v1';
   const SOURCE_KEY = 'nova.player.source.v1';
   const RGB_KEY = 'nova.player.rgb.v1';
+  const RGB_SETTINGS_KEY = 'nova.player.rgb.settings.v1';
+  const RGB_DEFAULTS = { enabled: true, source: 'balanced', palette: 'nova', intensity: 'medium', parts: { panel: true, header: true, buttons: true, active: true, progress: true, equalizer: true, orb: true, lyrics: true } };
+  const RGB_PALETTES = { nova: [188, 264, 322], fire: [12, 38, 0], cyber: [190, 280, 320], violet: [270, 310, 225], ice: [195, 210, 240], toxic: [126, 70, 180] };
 
   const state = {
     visible: false,
@@ -24,6 +28,11 @@
     source: readLocal(SOURCE_KEY, 'youtube-music'),
     rgb: readLocal(RGB_KEY, 'true') === 'true',
     ytm: null,
+    suno: null,
+    sunoLoading: false,
+    sunoQueryTimer: null,
+    rgbLabVisible: false,
+    rgbSettings: readJson(RGB_SETTINGS_KEY, RGB_DEFAULTS),
     sunoMessage: 'Prime Library opens a small authenticated Suno window and captures your saved songs.',
     timer: null
   };
@@ -78,7 +87,8 @@
   }
 
   function currentAudio() {
-    const audio = currentYtmState().audio || {};
+    const active = state.source === 'suno' ? (state.suno || {}) : currentYtmState();
+    const audio = active.audio || {};
     return {
       energy: clamp(audio.energy),
       bass: clamp(audio.bass),
@@ -91,8 +101,11 @@
 
   function applyReactiveVisuals() {
     const audio = currentAudio();
-    const react = state.rgb ? audio.react : 0;
-    const [h1, h2, h3] = audio.hues.map((value) => Number(value) || 0);
+    const settings = state.rgbSettings;
+    const source = settings.source === 'bass' ? audio.bass : settings.source === 'mid' ? audio.mid : settings.source === 'high' ? audio.high : settings.source === 'energy' ? audio.energy : audio.react;
+    const scale = settings.intensity === 'soft' ? .6 : settings.intensity === 'gremlin' ? 1.35 : 1;
+    const react = state.rgb && settings.enabled ? clamp(source * scale) : 0;
+    const [h1, h2, h3] = (RGB_PALETTES[settings.palette] || audio.hues).map((value) => Number(value) || 0);
     for (const panel of [document.getElementById(PANEL_ID), document.getElementById(LYRICS_ID)]) {
       if (!panel) continue;
       panel.classList.toggle('np-rgb', state.rgb);
@@ -155,6 +168,11 @@
       #${PANEL_ID} .np-placeholder{padding:15px;border:1px dashed rgba(168,85,247,.45);border-radius:13px;color:#c4b5fd;line-height:1.45;background:rgba(124,58,237,.08)}
       #${PANEL_ID} .np-viz{height:26px;margin-top:9px;padding:5px 8px;display:flex;align-items:end;gap:4px;border-radius:9px;background:rgba(255,255,255,.025);overflow:hidden}
       #${PANEL_ID} .np-viz span{display:block;flex:1;min-height:3px;border-radius:999px;background:linear-gradient(180deg,#22d3ee,#8b5cf6,#ec4899);transform-origin:bottom;transition:height .16s ease,filter .16s ease}
+      #${PANEL_ID} .np-suno-list{display:flex;flex-direction:column;gap:6px;max-height:205px;overflow:auto;margin-top:10px;padding-right:2px}
+      #${PANEL_ID} .np-suno-item{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px;border:1px solid rgba(148,163,184,.2);border-radius:10px;background:rgba(255,255,255,.035)}
+      #${PANEL_ID} .np-suno-item.active{outline:1px solid rgba(34,211,238,.75);background:rgba(34,211,238,.08)}
+      #${PANEL_ID} .np-suno-thumb{width:36px;height:36px;border-radius:8px;object-fit:cover;background:rgba(255,255,255,.08)}
+      #${PANEL_ID} .np-suno-search{width:100%;margin-top:10px;padding:9px;border-radius:10px;border:1px solid rgba(148,163,184,.3);background:#0f172a;color:#fff;outline:none}
       #${LYRICS_ID}{position:fixed;z-index:2147483644;width:min(470px,calc(100vw - 24px));height:min(78vh,800px);left:24px;top:110px;background:rgba(7,9,18,.98);color:#fff;border:1px solid rgba(34,211,238,.78);border-radius:18px;box-shadow:0 0 30px rgba(34,211,238,.34),0 18px 55px rgba(0,0,0,.5);font:13px Arial,sans-serif;overflow:hidden;display:none}
       #${LYRICS_ID} *{box-sizing:border-box}
       #${LYRICS_ID} .np-lyrics-head{padding:11px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed,#db2777);display:flex;justify-content:space-between;align-items:center;font-weight:900;cursor:move;user-select:none}
@@ -168,6 +186,8 @@
       #${LYRICS_ID} .np-lyrics-empty{color:#b8c2d5;line-height:1.55}
       #${PANEL_ID}.np-rgb,#${LYRICS_ID}.np-rgb{background:radial-gradient(circle at 15% 0%,hsla(var(--np-h1,188),96%,58%,.14),transparent 34%),radial-gradient(circle at 94% 16%,hsla(var(--np-h2,264),96%,58%,.12),transparent 39%),rgba(7,9,18,.98)}
       #${PANEL_ID}.np-rgb .np-head,#${LYRICS_ID}.np-rgb .np-lyrics-head{background:linear-gradient(90deg,hsla(var(--np-h1,188),88%,45%,.95),hsla(var(--np-h2,264),82%,48%,.95),hsla(var(--np-h3,322),84%,48%,.95))}
+      #${RGB_LAB_ID}{position:fixed;z-index:2147483646;width:min(365px,calc(100vw - 24px));right:24px;top:96px;background:rgba(7,9,18,.98);color:#fff;border:1px solid rgba(34,211,238,.78);border-radius:18px;box-shadow:0 0 30px rgba(34,211,238,.34),0 18px 55px rgba(0,0,0,.5);font:12px Arial,sans-serif;overflow:hidden;display:none}
+      #${RGB_LAB_ID} *{box-sizing:border-box}#${RGB_LAB_ID} .np-rgb-head{padding:11px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed,#db2777);display:flex;justify-content:space-between;align-items:center;font-weight:900;cursor:move;user-select:none}#${RGB_LAB_ID} .np-rgb-body{padding:10px;display:flex;flex-direction:column;gap:9px}#${RGB_LAB_ID} .np-rgb-card{padding:9px;border:1px solid rgba(148,163,184,.24);border-radius:12px;background:rgba(15,23,42,.92)}#${RGB_LAB_ID} .np-rgb-title{font-weight:900;margin-bottom:7px;color:#e0f2fe}#${RGB_LAB_ID} .np-rgb-row{display:flex;gap:6px;flex-wrap:wrap}#${RGB_LAB_ID} button{background:rgba(255,255,255,.07);color:#fff;border:1px solid rgba(34,211,238,.65);border-radius:9px;padding:7px 9px;cursor:pointer;font-weight:800}#${RGB_LAB_ID} button.active{background:#0e7490;border-color:#67e8f9}#${RGB_LAB_ID} .np-rgb-note{margin-top:6px;color:#aab5c7;line-height:1.35}
     `;
     (document.head || document.documentElement).appendChild(style);
   }
@@ -242,15 +262,122 @@
   }
 
   function renderSuno(body) {
-    body.appendChild(node('div', { className: 'np-placeholder' }, [
-      node('b', { text: 'Suno library remote' }),
-      node('div', { text: state.sunoMessage, style: 'margin-top:7px' })
+    const s = state.suno || {};
+    const clip = s.currentClip || {};
+    const duration = Number(s.duration || clip.duration || 0);
+    const current = Math.min(Number(s.currentTime || 0), duration || Number(s.currentTime || 0));
+    const artwork = clip.imageUrl ? node('img', { className: 'np-art', src: clip.imageUrl, alt: '' }) : node('div', { className: 'np-art' });
+    body.appendChild(node('div', { className: 'np-now' }, [artwork, node('div', { style: 'min-width:0' }, [
+      node('div', { className: 'np-title', text: clip.title || 'No Suno song loaded' }),
+      node('div', { className: 'np-artist', text: clip.model || 'Load Direct or Prime your Suno library' }),
+      node('div', { className: 'np-status', text: s.status || state.sunoMessage, style: 'color:#67e8f9' })
+    ])]));
+    body.appendChild(node('div', { className: 'np-row' }, [
+      node('button', { text: 'Prev', type: 'button', dataset: { action: 'suno-prev' } }),
+      node('button', { text: s.playing ? 'Pause' : 'Play', type: 'button', dataset: { action: 'suno-play' } }),
+      node('button', { text: 'Next', type: 'button', dataset: { action: 'suno-next' } })
+    ]));
+    const seek = node('input', { type: 'range', attrs: { min: 0, max: Math.max(1, duration), step: 1, value: current, disabled: true } });
+    body.append(node('div', { style: 'margin-top:11px' }, [seek, node('div', { className: 'np-times' }, [node('span', { text: formatTime(current) }), node('span', { text: formatTime(duration) })])]), visualizer(s.audio || {}));
+    body.appendChild(node('div', { className: 'np-row' }, [
+      node('button', { text: 'Load Direct', type: 'button', dataset: { action: 'suno-load' } }),
+      node('button', { text: 'Prime Quick', type: 'button', dataset: { action: 'suno-prime' } }),
+      node('button', { text: 'Prime Full', type: 'button', dataset: { action: 'suno-prime-full' } })
     ]));
     body.appendChild(node('div', { className: 'np-row' }, [
-      node('button', { text: 'Open Remote', type: 'button', dataset: { action: 'open-suno' } }),
-      node('button', { text: 'Prime Library', type: 'button', dataset: { action: 'prime-suno' } }),
-      node('button', { text: 'Open Suno.com', type: 'button', dataset: { action: 'open-suno-site' } })
+      node('button', { text: 'Shuffle', type: 'button', dataset: { action: 'suno-shuffle' } }),
+      node('button', { text: 'Open Suno', type: 'button', dataset: { action: 'open-suno-site' } }),
+      node('button', { text: 'Lyrics', type: 'button', dataset: { action: 'suno-lyrics' } })
     ]));
+    const search = node('input', { className: 'np-suno-search', attrs: { placeholder: 'Search saved Suno songs...', value: s.query || '' }, dataset: { range: 'suno-query' } });
+    body.appendChild(search);
+    const list = node('div', { className: 'np-suno-list' });
+    const library = Array.isArray(s.visibleLibrary) ? s.visibleLibrary : (Array.isArray(s.library) ? s.library : []);
+    library.slice(0, 80).forEach((item, index) => {
+      list.appendChild(node('div', { className: 'np-suno-item' + (item.id && item.id === clip.id ? ' active' : '') }, [
+        item.imageUrl ? node('img', { className: 'np-suno-thumb', src: item.imageUrl, alt: '' }) : node('div', { className: 'np-suno-thumb' }),
+        node('div', { style: 'min-width:0' }, [node('div', { className: 'np-title', text: item.title || 'Untitled' }), node('div', { className: 'np-artist', text: item.model || item.tags || '' })]),
+        node('button', { text: 'Play', type: 'button', dataset: { action: 'suno-play-index', index } })
+      ]));
+    });
+    body.appendChild(list);
+  }
+
+  function saveRgbSettings() {
+    writeLocal(RGB_KEY, String(state.rgb));
+    try { localStorage.setItem(RGB_SETTINGS_KEY, JSON.stringify(state.rgbSettings)); } catch (_) {}
+    send('audio-settings', state.rgbSettings);
+    const remote = window.NovaSunoRemoteAnyPage;
+    if (remote && typeof remote.setFxSettings === 'function') {
+      remote.setFxSettings({ ...state.rgbSettings, theme: state.rgb ? 'rgb' : 'steady' });
+    }
+    applyReactiveVisuals();
+  }
+
+  function rgbChoice(label, value, active, key) {
+    return node('button', { text: label, type: 'button', className: active ? 'active' : '', dataset: { rgbKey: key, rgbValue: value } });
+  }
+
+  function rgbCard(title, children, note) {
+    const card = node('div', { className: 'np-rgb-card' }, [node('div', { className: 'np-rgb-title', text: title }), node('div', { className: 'np-rgb-row' }, children)]);
+    if (note) card.appendChild(node('div', { className: 'np-rgb-note', text: note }));
+    return card;
+  }
+
+  function createRgbLab() {
+    injectStyle();
+    let panel = document.getElementById(RGB_LAB_ID);
+    if (panel) return panel;
+    panel = node('div', { id: RGB_LAB_ID });
+    const head = node('div', { className: 'np-rgb-head' }, [node('span', { text: 'Nova RGB Lab' }), node('button', { text: 'x', type: 'button', dataset: { rgbAction: 'close' } })]);
+    panel.append(head, node('div', { className: 'np-rgb-body' }));
+    document.body.appendChild(panel);
+    bindDrag(panel, head, 'nova.player.rgb.lab.position.v1');
+    restorePosition(panel, 'nova.player.rgb.lab.position.v1');
+    panel.addEventListener('click', onRgbLabClick);
+    return panel;
+  }
+
+  function renderRgbLab() {
+    const panel = createRgbLab();
+    const body = panel.querySelector('.np-rgb-body');
+    const s = state.rgbSettings;
+    body.replaceChildren(
+      rgbCard('Power', [rgbChoice(s.enabled ? 'Reactive On' : 'Reactive Off', 'enabled', s.enabled, 'toggle'), rgbChoice(state.rgb ? 'RGB Theme' : 'Steady Theme', 'theme', state.rgb, 'toggle')], 'Shared settings for Suno and YouTube Music.'),
+      rgbCard('Reaction Source', [['balanced','Balanced'],['energy','Energy'],['bass','Bass'],['mid','Mids'],['high','Highs']].map(([v,l]) => rgbChoice(l, v, s.source === v, 'source'))),
+      rgbCard('Color Style', [['nova','Nova RGB'],['fire','Fire'],['cyber','Cyber'],['violet','Violet'],['ice','Ice'],['toxic','Toxic']].map(([v,l]) => rgbChoice(l, v, s.palette === v, 'palette'))),
+      rgbCard('Intensity', [['soft','Soft'],['medium','Medium'],['gremlin','Gremlin']].map(([v,l]) => rgbChoice(l, v, s.intensity === v, 'intensity'))),
+      rgbCard('React Parts', [['panel','Panel'],['header','Header'],['buttons','Buttons'],['active','Active Song'],['progress','Progress'],['equalizer','Equalizer'],['lyrics','Lyrics Glow']].map(([v,l]) => rgbChoice(l, v, Boolean(s.parts[v]), 'part')))
+    );
+  }
+
+  function openRgbLab() {
+    state.rgbLabVisible = true;
+    const panel = createRgbLab();
+    panel.style.display = 'block';
+    renderRgbLab();
+  }
+
+  function onRgbLabClick(event) {
+    const button = event.target.closest('button');
+    if (!button) return;
+    if (button.dataset.rgbAction === 'close') { state.rgbLabVisible = false; document.getElementById(RGB_LAB_ID).style.display = 'none'; return; }
+    const key = button.dataset.rgbKey;
+    const value = button.dataset.rgbValue;
+    if (!key) return;
+    if (key === 'toggle' && value === 'enabled') state.rgbSettings.enabled = !state.rgbSettings.enabled;
+    else if (key === 'toggle' && value === 'theme') state.rgb = !state.rgb;
+    else if (key === 'part') state.rgbSettings.parts[value] = !state.rgbSettings.parts[value];
+    else state.rgbSettings[key] = value;
+    saveRgbSettings();
+    renderRgbLab();
+  }
+
+  function readJson(key, fallback) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(key) || 'null');
+      return saved && typeof saved === 'object' ? { ...fallback, ...saved, parts: { ...fallback.parts, ...(saved.parts || {}) } } : fallback;
+    } catch (_) { return fallback; }
   }
 
   function render() {
@@ -269,6 +396,13 @@
   function lyricSignature(ytm) {
     const lyrics = ytm && ytm.lyrics ? ytm.lyrics : {};
     return [ytm.title || '', ytm.artist || '', lyrics.text || ''].join('\u0000');
+  }
+
+  function currentLyricsState() {
+    if (state.source !== 'suno') return currentYtmState();
+    const suno = state.suno || {};
+    const clip = suno.currentClip || {};
+    return { title: clip.title || 'Suno lyrics', artist: clip.model || 'Suno library', lyrics: { text: clip.prompt || '' } };
   }
 
   function createLyricsPanel() {
@@ -296,7 +430,7 @@
 
   function renderLyrics(force = false) {
     const panel = createLyricsPanel();
-    const ytm = currentYtmState();
+    const ytm = currentLyricsState();
     const signature = lyricSignature(ytm);
     if (!force && signature === state.lyricsSignature) return;
     state.lyricsSignature = signature;
@@ -304,8 +438,8 @@
     const details = panel.querySelector('.np-lyrics-now');
     const body = panel.querySelector('.np-lyrics-body');
     details.replaceChildren(
-      node('div', { className: 'np-lyrics-title', text: ytm.title || 'YouTube Music lyrics' }),
-      node('div', { className: 'np-lyrics-artist', text: ytm.artist || 'Open a track in YouTube Music' })
+      node('div', { className: 'np-lyrics-title', text: ytm.title || (state.source === 'suno' ? 'Suno lyrics' : 'YouTube Music lyrics') }),
+      node('div', { className: 'np-lyrics-artist', text: ytm.artist || (state.source === 'suno' ? 'Load a Suno song' : 'Open a track in YouTube Music') })
     );
 
     const textValue = ytm.lyrics && ytm.lyrics.text ? ytm.lyrics.text : '';
@@ -313,7 +447,7 @@
       ? node('div', { text: textValue })
       : node('div', {
         className: 'np-lyrics-empty',
-        text: 'No lyrics are visible yet. Nova asked YouTube Music to open its Lyrics tab. If this track has lyrics, give it a moment or press Refresh.'
+        text: state.source === 'suno' ? 'No Suno prompt or lyrics are saved for this song yet.' : 'No lyrics are visible yet. Nova asked YouTube Music to open its Lyrics tab. If this track has lyrics, give it a moment or press Refresh.'
       }));
   }
 
@@ -322,9 +456,11 @@
     const panel = createLyricsPanel();
     panel.style.display = 'block';
     renderLyrics(true);
-    send('lyrics');
-    setTimeout(() => renderLyrics(true), 900);
-    setTimeout(() => renderLyrics(true), 2000);
+    if (state.source === 'youtube-music') {
+      send('lyrics');
+      setTimeout(() => renderLyrics(true), 900);
+      setTimeout(() => renderLyrics(true), 2000);
+    }
   }
 
   function hideLyrics() {
@@ -339,11 +475,11 @@
     const action = button.dataset.lyricsAction;
     if (action === 'close') hideLyrics();
     else if (action === 'refresh') {
-      send('lyrics');
+      if (state.source === 'youtube-music') send('lyrics');
       state.lyricsSignature = '';
       setTimeout(() => renderLyrics(true), 900);
     } else if (action === 'copy') {
-      const ytm = currentYtmState();
+      const ytm = currentLyricsState();
       const textValue = ytm.lyrics && ytm.lyrics.text ? ytm.lyrics.text : '';
       if (!textValue) return;
       try {
@@ -360,18 +496,17 @@
     if (button.dataset.source) {
       state.source = button.dataset.source;
       writeLocal(SOURCE_KEY, state.source);
+      if (state.source === 'suno') await activateSuno();
       render();
       return;
     }
     const action = button.dataset.np || button.dataset.action;
     if (action === 'close') hide();
-    else if (action === 'rgb') {
-      state.rgb = !state.rgb;
-      writeLocal(RGB_KEY, String(state.rgb));
-      applyReactiveVisuals();
-    }
+    else if (action === 'rgb') openRgbLab();
     else if (['previous','play-pause','next','shuffle','repeat','mute'].includes(action)) send(action);
     else if (action === 'lyrics') openLyrics();
+    else if (action === 'suno-lyrics') openLyrics();
+    else if (/^suno-/.test(action)) runSuno(action, button.dataset.index);
     else if (action === 'open-ytm') window.open('https://music.youtube.com/', '_blank');
     else if (action === 'open-suno-site') window.open('https://suno.com/me', '_blank');
     else if (action === 'open-suno') await openSunoRemote(false);
@@ -395,6 +530,52 @@
   function refreshSuno(message) {
     state.sunoMessage = message;
     if (state.visible && state.source === 'suno') render();
+  }
+
+  function syncSuno(remote) {
+    const active = remote || window.NovaSunoRemoteAnyPage;
+    if (!active || typeof active.getState !== 'function') return null;
+    try {
+      state.suno = active.getState();
+      return state.suno;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function activateSuno() {
+    if (state.sunoLoading) return;
+    state.sunoLoading = true;
+    refreshSuno('Loading the Suno library engine...');
+    try {
+      const remote = await getSunoRemote();
+      if (!remote) throw new Error('Nova Suno Remote did not load.');
+      if (typeof remote.embed === 'function') remote.embed();
+      else if (typeof remote.hide === 'function') remote.hide();
+      syncSuno(remote);
+      refreshSuno('Suno library ready inside Nova Player.');
+    } catch (error) {
+      refreshSuno('Suno library could not start: ' + (error && error.message ? error.message : 'unknown error'));
+    } finally {
+      state.sunoLoading = false;
+    }
+  }
+
+  function runSuno(action, value) {
+    const remote = window.NovaSunoRemoteAnyPage;
+    if (!remote) return activateSuno();
+    const actions = {
+      'suno-prev': () => remote.playPrev && remote.playPrev(),
+      'suno-play': () => remote.togglePlay && remote.togglePlay(),
+      'suno-next': () => remote.playNext && remote.playNext(),
+      'suno-shuffle': () => remote.shuffle && remote.shuffle(),
+      'suno-load': () => remote.loadDirect && remote.loadDirect(2),
+      'suno-prime': () => remote.prime && remote.prime(),
+      'suno-prime-full': () => remote.primeFull && remote.primeFull(),
+      'suno-play-index': () => remote.playIndex && remote.playIndex(Number(value))
+    };
+    try { actions[action] && actions[action](); } catch (_) {}
+    setTimeout(() => { syncSuno(remote); render(); }, 150);
   }
 
   async function getSunoRemote() {
@@ -450,6 +631,15 @@
     const type = event.target && event.target.dataset ? event.target.dataset.range : '';
     if (type === 'seek') send('seek', Number(event.target.value));
     if (type === 'volume') send('volume', Number(event.target.value));
+    if (type === 'suno-query') {
+      const remote = window.NovaSunoRemoteAnyPage;
+      if (remote && typeof remote.setQuery === 'function') {
+        remote.setQuery(event.target.value);
+        syncSuno(remote);
+        clearTimeout(state.sunoQueryTimer);
+        state.sunoQueryTimer = setTimeout(render, 260);
+      }
+    }
   }
 
   function restorePosition(panel, storageKey = POSITION_KEY) {
@@ -486,6 +676,7 @@
 
   function poll() {
     state.ytm = gmGet(STATE_KEY, null);
+    if (state.source === 'suno') syncSuno();
     if (state.visible && state.source === 'youtube-music') render();
     if (state.lyricsVisible) renderLyrics();
     applyReactiveVisuals();
@@ -496,6 +687,7 @@
     const panel = createPanel();
     panel.style.display = 'block';
     render();
+    if (state.source === 'suno') activateSuno();
     if (!state.timer) state.timer = setInterval(poll, 700);
   }
 
