@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Suno Remote - Any Page v0.12
 // @namespace    nova.suno.remote.anypage
-// @version      0.1.153
+// @version      0.1.154
 // @description  Pocket Gremlin Edition: read-only Suno remote with full-library prime capture, lyrics reader, RGB Lab, and audio-reactive playback UI.
 // @author       Cody / Codex + kivkumah + Nova
 // @match        *://*/*
@@ -36,7 +36,7 @@
   if (window.top !== window.self) return;
   if (window.NovaSunoRemoteAnyPage) return;
 
-  const VERSION = '0.1.153';
+  const VERSION = '0.1.154';
   const API = 'https://studio-api-prod.suno.com';
   const IS_SUNO = location.hostname === 'suno.com' || location.hostname.endsWith('.suno.com');
   const PRIME_PARAM = 'nova_suno_prime';
@@ -2120,30 +2120,40 @@
     if (!pageWindow || pageWindow.__novaSunoRemoteCaptureInstalled) return;
     pageWindow.__novaSunoRemoteCaptureInstalled = true;
 
-    const maybeCapture = async (url, responsePromise, bodyPromise) => {
-      const textUrl = String(url || '');
-      if (!/studio-api-prod\.suno\.com\/api\/(unified\/feed|feed\/v3|project\/default|project\/default\/pinned-clips)/i.test(textUrl)) return;
+    function requestUrlText(input) {
       try {
-        if (/studio-api-prod\.suno\.com\/api\/(unified\/feed|feed\/v3)/i.test(textUrl) && bodyPromise) {
-          bodyPromise.then(body => saveRecipeFromText(textUrl, body)).catch(() => {});
-        }
-
-        const response = await responsePromise;
-        const clone = response && response.clone ? response.clone() : null;
-        if (!clone) return;
-        const data = await clone.json();
-        captureSunoPayload(textUrl, data);
+        if (typeof input === 'string') return input;
+        return input && typeof input.url === 'string' ? input.url : '';
       } catch (_) {
-        // Keep capture silent. We do not want to break Suno if a response is not JSON.
+        return '';
       }
+    }
+
+    const maybeCapture = (url, responsePromise, bodyPromise) => {
+      const textUrl = requestUrlText(url);
+      if (!/studio-api-prod\.suno\.com\/api\/(unified\/feed|feed\/v3|project\/default|project\/default\/pinned-clips)/i.test(textUrl)) return;
+      if (/studio-api-prod\.suno\.com\/api\/(unified\/feed|feed\/v3)/i.test(textUrl) && bodyPromise) {
+        Promise.resolve(bodyPromise).then(body => saveRecipeFromText(textUrl, body)).catch(() => {});
+      }
+
+      // The page request is already in flight. Keep every observation detached
+      // so Firefox bridge errors can never reject Suno's own fetch promise.
+      Promise.resolve(responsePromise)
+        .then((response) => {
+          try { return response && typeof response.clone === 'function' ? response.clone().json() : null; }
+          catch (_) { return null; }
+        })
+        .then((data) => { if (data) captureSunoPayload(textUrl, data); })
+        .catch(() => {});
     };
 
     const originalFetch = pageWindow.fetch;
     if (typeof originalFetch === 'function') {
       pageWindow.fetch = function novaSunoRemoteFetch(input, init) {
-        const url = typeof input === 'string' ? input : input && input.url;
-        const result = originalFetch.apply(this, arguments);
-        maybeCapture(url, result, fetchBodyText(input, init));
+        const url = requestUrlText(input);
+        // Bind the native method to the page window, never the Bootstrap realm.
+        const result = originalFetch.apply(pageWindow, arguments);
+        try { maybeCapture(url, result, fetchBodyText(input, init)); } catch (_) {}
         return result;
       };
     }
@@ -2157,16 +2167,16 @@
       };
       pageWindow.XMLHttpRequest.prototype.send = function novaSunoRemoteXhrSend() {
         const xhr = this;
-        const url = xhr.__novaSunoRemoteUrl;
+        const url = requestUrlText(xhr.__novaSunoRemoteUrl);
         const bodyText = xhrBodyText(arguments[0]);
-        if (/studio-api-prod\.suno\.com\/api\/(unified\/feed|feed\/v3)/i.test(String(url || ''))) {
-          saveRecipeFromText(String(url || ''), bodyText);
+        if (/studio-api-prod\.suno\.com\/api\/(unified\/feed|feed\/v3)/i.test(url)) {
+          saveRecipeFromText(url, bodyText);
         }
-        if (/studio-api-prod\.suno\.com\/api\/(unified\/feed|feed\/v3|project\/default|project\/default\/pinned-clips)/i.test(String(url || ''))) {
+        if (/studio-api-prod\.suno\.com\/api\/(unified\/feed|feed\/v3|project\/default|project\/default\/pinned-clips)/i.test(url)) {
           xhr.addEventListener('load', () => {
             try {
               const data = JSON.parse(xhr.responseText || '{}');
-              captureSunoPayload(String(url || ''), data);
+              captureSunoPayload(url, data);
             } catch (_) {
               // silent
             }
