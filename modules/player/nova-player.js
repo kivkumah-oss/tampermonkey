@@ -4,7 +4,7 @@
   'use strict';
   if (window.NovaPlayer) return;
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.1.1';
   const PANEL_ID = 'nova-player';
   const STYLE_ID = 'nova-player-style';
   const STATE_KEY = 'nova.ytm.state.v1';
@@ -17,6 +17,7 @@
     panel: null,
     source: readLocal(SOURCE_KEY, 'youtube-music'),
     ytm: null,
+    sunoMessage: 'Prime Library opens a small authenticated Suno window and captures your saved songs.',
     timer: null
   };
 
@@ -174,12 +175,13 @@
 
   function renderSuno(body) {
     body.appendChild(node('div', { className: 'np-placeholder' }, [
-      node('b', { text: 'Suno adapter migration in progress' }),
-      node('div', { text: 'The unified shell is ready. This first build launches the proven Suno Remote so we do not break your library, lyrics, Prime capture, or RGB Lab.', style: 'margin-top:7px' })
+      node('b', { text: 'Suno library remote' }),
+      node('div', { text: state.sunoMessage, style: 'margin-top:7px' })
     ]));
     body.appendChild(node('div', { className: 'np-row' }, [
-      node('button', { text: 'Open Suno Player', type: 'button', dataset: { action: 'open-suno' } }),
-      node('button', { text: 'Open Suno', type: 'button', dataset: { action: 'open-suno-site' } })
+      node('button', { text: 'Open Remote', type: 'button', dataset: { action: 'open-suno' } }),
+      node('button', { text: 'Prime Library', type: 'button', dataset: { action: 'prime-suno' } }),
+      node('button', { text: 'Open Suno.com', type: 'button', dataset: { action: 'open-suno-site' } })
     ]));
   }
 
@@ -191,7 +193,7 @@
     else renderYtm(body);
   }
 
-  function onClick(event) {
+  async function onClick(event) {
     const button = event.target.closest('button');
     if (!button) return;
     if (button.dataset.source) {
@@ -206,8 +208,75 @@
     else if (['previous','play-pause','next','shuffle','repeat','mute'].includes(action)) send(action);
     else if (action === 'open-ytm') window.open('https://music.youtube.com/', '_blank');
     else if (action === 'open-suno-site') window.open('https://suno.com/me', '_blank');
-    else if (action === 'open-suno') {
-      try { document.dispatchEvent(new CustomEvent('nova-module-command', { detail: { action: 'launch', id: 'nova-suno-remote-any-page' } })); } catch (_) {}
+    else if (action === 'open-suno') await openSunoRemote(false);
+    else if (action === 'prime-suno') await openSunoRemote(true);
+  }
+
+  function sunoRemoteModule() {
+    try {
+      const loader = window.NovaModuleLoader;
+      const registry = loader && typeof loader.getRegistry === 'function'
+        ? loader.getRegistry()
+        : window.Nova && Array.isArray(window.Nova.modulesRegistry)
+          ? window.Nova.modulesRegistry
+          : [];
+      return registry.find((item) => item && item.id === 'nova-suno-remote-any-page') || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function refreshSuno(message) {
+    state.sunoMessage = message;
+    if (state.visible && state.source === 'suno') render();
+  }
+
+  async function getSunoRemote() {
+    if (window.NovaSunoRemoteAnyPage) return window.NovaSunoRemoteAnyPage;
+
+    const loader = window.NovaModuleLoader;
+    const module = sunoRemoteModule();
+    if (loader && module && typeof loader.loadScript === 'function') {
+      await loader.loadScript(module, { manual: true });
+      if (window.NovaSunoRemoteAnyPage) return window.NovaSunoRemoteAnyPage;
+    }
+
+    // Keep the document-event bridge as a fallback for Firefox userscript sandboxes.
+    try {
+      document.dispatchEvent(new CustomEvent('nova-module-command', {
+        detail: { action: 'launch', id: 'nova-suno-remote-any-page' }
+      }));
+    } catch (_) {}
+
+    return new Promise((resolve) => {
+      let attempts = 0;
+      const timer = setInterval(() => {
+        attempts += 1;
+        if (window.NovaSunoRemoteAnyPage || attempts >= 12) {
+          clearInterval(timer);
+          resolve(window.NovaSunoRemoteAnyPage || null);
+        }
+      }, 100);
+    });
+  }
+
+  async function openSunoRemote(prime) {
+    refreshSuno(prime ? 'Preparing your authenticated Suno library capture...' : 'Loading the Suno Remote...');
+    try {
+      const remote = await getSunoRemote();
+      if (!remote) throw new Error('Nova Suno Remote did not load.');
+      if (prime) {
+        if (typeof remote.prime !== 'function') throw new Error('Prime Library is unavailable.');
+        remote.prime();
+        refreshSuno('Prime Library opened. The tiny Suno window will capture your library, then this remote can play it anywhere.');
+      } else {
+        if (typeof remote.show !== 'function') throw new Error('Open Remote is unavailable.');
+        remote.show();
+        refreshSuno('Suno Remote opened with your saved library, lyrics reader, and RGB Lab.');
+      }
+    } catch (error) {
+      console.warn('[Nova Player] Suno hand-off failed', error);
+      refreshSuno('Suno Remote could not start: ' + (error && error.message ? error.message : 'unknown error'));
     }
   }
 
