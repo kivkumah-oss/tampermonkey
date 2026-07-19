@@ -5,18 +5,15 @@
 
   if (window.NovaMenuDevKitGate) return;
 
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.0';
   const MENU_ID = 'nova-modules-menu';
-  const OWNER_KEY = 'nova.owner.devkit.enabled';
   const THEME_OPEN_KEY = 'nova.menu.themes.open';
 
   const state = {
-    owner: false,
-    devkitView: false,
+    specialView: '',
     themeOpen: false,
     observer: null,
-    applying: false,
-    titleClicks: []
+    applying: false
   };
 
   function readBool(key, fallback) {
@@ -32,7 +29,6 @@
     try { localStorage.setItem(key, value ? 'true' : 'false'); } catch (_) {}
   }
 
-  state.owner = readBool(OWNER_KEY, false);
   state.themeOpen = readBool(THEME_OPEN_KEY, false);
 
   function text(node) {
@@ -55,19 +51,12 @@
     }) || null;
   }
 
-  function isAdvanced(panel) {
-    const advanced = panel.querySelector('[data-nova-view="advanced"]');
-    return Boolean(advanced && /168,85,247|c084fc|8b5cf6/i.test(advanced.getAttribute('style') || ''));
+  function collectHtml(panel, names) {
+    return names.map((name) => cardNamed(panel, [name])).filter(Boolean).map((node) => node.outerHTML).join('');
   }
 
-  function collectDevKitHtml(panel) {
-    const names = ['devkit / trace', 'devkit / dom inspector', 'investigation bundle'];
-    const found = names.map((name) => cardNamed(panel, [name])).filter(Boolean);
-    return found.map((node) => node.outerHTML).join('');
-  }
-
-  function removeDevKitCards(panel) {
-    ['devkit / trace', 'devkit / dom inspector', 'investigation bundle'].forEach((name) => {
+  function removeCards(panel, names) {
+    names.forEach((name) => {
       const node = cardNamed(panel, [name]);
       if (node) node.remove();
     });
@@ -105,33 +94,34 @@
     card.dataset.novaCollapsedReady = '1';
   }
 
-  function ensureDevKitTab(panel) {
+  function ensureTab(panel, name, label) {
     const tabs = panel.querySelector('.nova-menu-tabs');
-    if (!tabs) return;
+    if (!tabs) return null;
 
-    let button = tabs.querySelector('[data-nova-private-devkit]');
-    if (!state.owner) {
-      if (button) button.remove();
-      return;
-    }
-
+    let button = tabs.querySelector(`[data-nova-special-view="${name}"]`);
     if (!button) {
       button = document.createElement('button');
       button.type = 'button';
-      button.dataset.novaPrivateDevkit = '1';
-      button.textContent = 'DevKit';
+      button.dataset.novaSpecialView = name;
+      button.textContent = label;
       tabs.appendChild(button);
     }
 
-    button.style.borderColor = state.devkitView
-      ? 'rgba(244,114,182,.95)'
+    button.style.borderColor = state.specialView === name
+      ? (name === 'devkit' ? 'rgba(244,114,182,.95)' : 'rgba(34,211,238,.95)')
       : 'rgba(255,255,255,.18)';
+    return button;
   }
 
-  function renderDevKit(panel, html) {
+  function ensureSpecialTabs(panel) {
+    ensureTab(panel, 'devkit', 'DevKit');
+    ensureTab(panel, 'info', 'Info');
+  }
+
+  function renderSpecial(panel, html, fallbackTitle, fallbackText) {
     const body = panel.querySelector('.nova-menu-body');
     if (!body) return;
-    body.innerHTML = html || '<div class="nova-card"><b style="color:#f0abfc;">DevKit unavailable</b><div class="nova-muted" style="margin-top:6px;">The optional investigation APIs are not loaded on this page.</div></div>';
+    body.innerHTML = html || `<div class="nova-card"><b style="color:#f0abfc;">${fallbackTitle}</b><div class="nova-muted" style="margin-top:6px;">${fallbackText}</div></div>`;
   }
 
   function bind(panel) {
@@ -152,9 +142,9 @@
         return;
       }
 
-      const devkit = event.target.closest('[data-nova-private-devkit]');
-      if (devkit && state.owner) {
-        state.devkitView = true;
+      const special = event.target.closest('[data-nova-special-view]');
+      if (special) {
+        state.specialView = special.dataset.novaSpecialView || '';
         apply();
         event.preventDefault();
         event.stopPropagation();
@@ -162,22 +152,7 @@
       }
 
       const normalTab = event.target.closest('[data-nova-view]');
-      if (normalTab) state.devkitView = false;
-
-      const title = event.target.closest('.nova-menu-head span');
-      if (title) {
-        const now = Date.now();
-        state.titleClicks = state.titleClicks.filter((time) => now - time < 3000);
-        state.titleClicks.push(now);
-        if (state.titleClicks.length >= 5) {
-          state.titleClicks = [];
-          state.owner = !state.owner;
-          state.devkitView = false;
-          writeBool(OWNER_KEY, state.owner);
-          apply();
-          console.log('[Nova Core] Private DevKit access ' + (state.owner ? 'enabled' : 'disabled'));
-        }
-      }
+      if (normalTab) state.specialView = '';
     }, true);
   }
 
@@ -189,17 +164,26 @@
     state.applying = true;
     try {
       bind(panel);
-      const devkitHtml = collectDevKitHtml(panel);
-      removeDevKitCards(panel);
-      ensureDevKitTab(panel);
 
-      if (state.devkitView && state.owner) {
-        renderDevKit(panel, devkitHtml || panel.dataset.novaDevkitHtml || '');
-      } else if (isAdvanced(panel)) {
-        decorateThemes(panel);
-      }
+      const devkitNames = ['devkit / trace', 'devkit / dom inspector', 'investigation bundle'];
+      const coreNames = ['core'];
+      const devkitHtml = collectHtml(panel, devkitNames);
+      const coreHtml = collectHtml(panel, coreNames);
 
       if (devkitHtml) panel.dataset.novaDevkitHtml = devkitHtml;
+      if (coreHtml) panel.dataset.novaCoreHtml = coreHtml;
+
+      removeCards(panel, devkitNames);
+      removeCards(panel, coreNames);
+      ensureSpecialTabs(panel);
+
+      if (state.specialView === 'devkit') {
+        renderSpecial(panel, panel.dataset.novaDevkitHtml || '', 'DevKit unavailable', 'The optional investigation APIs are not loaded on this page.');
+      } else if (state.specialView === 'info') {
+        renderSpecial(panel, panel.dataset.novaCoreHtml || '', 'Core information unavailable', 'Nova core registry information is not available on this page.');
+      } else {
+        decorateThemes(panel);
+      }
     } finally {
       state.applying = false;
     }
@@ -215,9 +199,8 @@
 
   window.NovaMenuDevKitGate = {
     version: VERSION,
-    isOwner: () => state.owner,
-    enableOwner() { state.owner = true; writeBool(OWNER_KEY, true); apply(); },
-    disableOwner() { state.owner = false; state.devkitView = false; writeBool(OWNER_KEY, false); apply(); },
+    openDevKit() { state.specialView = 'devkit'; apply(); },
+    openInfo() { state.specialView = 'info'; apply(); },
     refresh: apply
   };
 
