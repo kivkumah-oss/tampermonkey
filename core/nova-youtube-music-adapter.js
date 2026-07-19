@@ -5,13 +5,15 @@
 
   if (window.NovaYouTubeMusicAdapter) return;
 
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.0';
   const STATE_KEY = 'nova.ytm.state.v1';
   const COMMAND_KEY = 'nova.ytm.command.v1';
   const IS_YTM = location.hostname === 'music.youtube.com';
 
   let lastCommandId = '';
   let timer = null;
+  let lastLyricsReadAt = 0;
+  let cachedLyrics = { available: false, text: '', source: '', updatedAt: 0 };
 
   function gmGet(key, fallback) {
     try {
@@ -60,6 +62,44 @@
     return true;
   }
 
+  function readLyrics() {
+    const lyricNode = first([
+      'ytmusic-description-shelf-renderer yt-formatted-string.description.split-lines',
+      'ytmusic-description-shelf-renderer yt-formatted-string.non-expandable.description',
+      'ytmusic-description-shelf-renderer yt-formatted-string.description'
+    ]);
+    const raw = lyricNode ? String(lyricNode.innerText || lyricNode.textContent || '') : '';
+    const textValue = raw
+      .replace(/\r/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/\nSource:\s*Musixmatch\s*$/i, '')
+      .trim()
+      .slice(0, 20000);
+
+    return {
+      available: Boolean(textValue),
+      text: textValue,
+      source: textValue ? 'YouTube Music' : '',
+      updatedAt: Date.now()
+    };
+  }
+
+  function currentLyrics() {
+    if (Date.now() - lastLyricsReadAt > 1800) {
+      cachedLyrics = readLyrics();
+      lastLyricsReadAt = Date.now();
+    }
+    return cachedLyrics;
+  }
+
+  function openLyricsTab() {
+    const tab = Array.from(document.querySelectorAll('ytmusic-player-page tp-yt-paper-tab, ytmusic-player-page [role="tab"]'))
+      .find((node) => /lyrics/i.test(String(node.textContent || '') + ' ' + String(node.getAttribute('aria-label') || '')));
+    if (!tab) return false;
+    tab.click();
+    return true;
+  }
+
   function readState() {
     const m = media();
     const playButton = first([
@@ -79,6 +119,7 @@
       duration: m && Number.isFinite(m.duration) ? m.duration : 0,
       volume: m && Number.isFinite(m.volume) ? m.volume : 1,
       muted: Boolean(m && m.muted),
+      lyrics: currentLyrics(),
       url: location.href,
       updatedAt: Date.now(),
       adapterVersion: VERSION
@@ -134,6 +175,12 @@
         break;
       case 'mute':
         if (m) m.muted = !m.muted;
+        break;
+      case 'lyrics':
+        openLyricsTab();
+        lastLyricsReadAt = 0;
+        setTimeout(publish, 650);
+        setTimeout(publish, 1600);
         break;
     }
 
