@@ -5,13 +5,14 @@
 
   if (window.NovaYouTubeMusicAdapter) return;
 
-  const VERSION = '1.1.1';
+  const VERSION = '1.2.0';
   const STATE_KEY = 'nova.ytm.state.v1';
   const COMMAND_KEY = 'nova.ytm.command.v1';
   const IS_YTM = location.hostname === 'music.youtube.com';
 
   let lastCommandId = '';
   let timer = null;
+  let themedMedia = null;
   let lastLyricsReadAt = 0;
   let cachedLyrics = { available: false, text: '', source: '', updatedAt: 0 };
 
@@ -35,6 +36,33 @@
 
   function media() {
     return document.querySelector('video') || document.querySelector('audio');
+  }
+
+  function startAudioTheme(m) {
+    if (!m || m === themedMedia) return;
+    const theme = window.NovaAudioTheme;
+    if (!theme || typeof theme.start !== 'function') return;
+    try {
+      theme.start(m, { syntheticFallback: true, tryReal: true });
+      themedMedia = m;
+    } catch (error) {
+      console.warn('[Nova Core] YouTube Music audio theme unavailable', error);
+    }
+  }
+
+  function audioMetrics() {
+    const theme = window.NovaAudioTheme;
+    const metrics = theme && typeof theme.getMetrics === 'function' ? theme.getMetrics() : {};
+    const number = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
+    return {
+      energy: number(metrics.energy),
+      bass: number(metrics.bass),
+      mid: number(metrics.mid),
+      high: number(metrics.high),
+      react: number(metrics.react),
+      hues: Array.isArray(metrics.hues) ? metrics.hues.slice(0, 3) : [188, 264, 322],
+      mode: String(metrics.mode || 'idle')
+    };
   }
 
   function text(selector) {
@@ -117,6 +145,7 @@
 
   function readState() {
     const m = media();
+    startAudioTheme(m);
     const playButton = first([
       'ytmusic-player-bar #play-pause-button',
       'ytmusic-player-bar [aria-label*="Pause"]',
@@ -134,6 +163,7 @@
       duration: m && Number.isFinite(m.duration) ? m.duration : 0,
       volume: m && Number.isFinite(m.volume) ? m.volume : 1,
       muted: Boolean(m && m.muted),
+      audio: audioMetrics(),
       lyrics: currentLyrics(),
       url: location.href,
       updatedAt: Date.now(),

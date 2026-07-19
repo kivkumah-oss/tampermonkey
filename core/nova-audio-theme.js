@@ -5,7 +5,7 @@
 
   if (window.NovaAudioTheme) return;
 
-  const VERSION = '0.1.1';
+  const VERSION = '0.1.2';
   const STYLE_ID = 'nova-audio-theme-core-style';
   const STORE_KEY = 'nova.audioTheme.settings';
 
@@ -533,7 +533,7 @@
       ? Boolean(options.syntheticFallback)
       : state.settings.syntheticFallback;
 
-    if (sourceLooksCrossOrigin(audio) && allowSynthetic) {
+    if (sourceLooksCrossOrigin(audio) && allowSynthetic && !options.tryReal) {
       return startSynthetic(audio);
     }
 

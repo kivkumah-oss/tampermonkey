@@ -4,7 +4,7 @@
   'use strict';
   if (window.NovaPlayer) return;
 
-  const VERSION = '0.2.0';
+  const VERSION = '0.3.0';
   const PANEL_ID = 'nova-player';
   const LYRICS_ID = 'nova-ytm-lyrics';
   const STYLE_ID = 'nova-player-style';
@@ -13,6 +13,7 @@
   const POSITION_KEY = 'nova.player.position.v1';
   const LYRICS_POSITION_KEY = 'nova.player.lyrics.position.v1';
   const SOURCE_KEY = 'nova.player.source.v1';
+  const RGB_KEY = 'nova.player.rgb.v1';
 
   const state = {
     visible: false,
@@ -21,6 +22,7 @@
     lyricsPanel: null,
     lyricsSignature: '',
     source: readLocal(SOURCE_KEY, 'youtube-music'),
+    rgb: readLocal(RGB_KEY, 'true') === 'true',
     ytm: null,
     sunoMessage: 'Prime Library opens a small authenticated Suno window and captures your saved songs.',
     timer: null
@@ -71,6 +73,51 @@
     return Math.floor(value / 60) + ':' + String(Math.floor(value % 60)).padStart(2, '0');
   }
 
+  function clamp(value) {
+    return Math.max(0, Math.min(1, Number(value) || 0));
+  }
+
+  function currentAudio() {
+    const audio = currentYtmState().audio || {};
+    return {
+      energy: clamp(audio.energy),
+      bass: clamp(audio.bass),
+      mid: clamp(audio.mid),
+      high: clamp(audio.high),
+      react: clamp(audio.react),
+      hues: Array.isArray(audio.hues) && audio.hues.length >= 3 ? audio.hues : [188, 264, 322]
+    };
+  }
+
+  function applyReactiveVisuals() {
+    const audio = currentAudio();
+    const react = state.rgb ? audio.react : 0;
+    const [h1, h2, h3] = audio.hues.map((value) => Number(value) || 0);
+    for (const panel of [document.getElementById(PANEL_ID), document.getElementById(LYRICS_ID)]) {
+      if (!panel) continue;
+      panel.classList.toggle('np-rgb', state.rgb);
+      panel.style.setProperty('--np-h1', String(h1));
+      panel.style.setProperty('--np-h2', String(h2));
+      panel.style.setProperty('--np-h3', String(h3));
+      if (!state.rgb) {
+        panel.style.removeProperty('border-color');
+        panel.style.removeProperty('box-shadow');
+        continue;
+      }
+      const glow = Math.round(16 + react * 52);
+      const alpha = (0.24 + react * 0.58).toFixed(2);
+      panel.style.borderColor = `hsla(${h1},96%,${Math.round(58 + react * 18)}%,.95)`;
+      panel.style.boxShadow = `0 0 ${glow}px hsla(${h1},96%,62%,${alpha}),0 0 ${Math.round(glow * 1.6)}px hsla(${h2},96%,62%,${(alpha * 0.48).toFixed(2)}),0 18px 55px rgba(0,0,0,.5)`;
+    }
+  }
+
+  function visualizer(audio) {
+    const strengths = [audio.bass, audio.mid, audio.high, audio.energy, audio.bass, audio.mid, audio.high, audio.energy];
+    return node('div', { className: 'np-viz', attrs: { 'aria-hidden': 'true' } }, strengths.map((strength, index) =>
+      node('span', { style: `height:${Math.round(4 + clamp(strength) * (14 + (index % 3) * 2))}px` })
+    ));
+  }
+
   function send(action, value) {
     gmSet(COMMAND_KEY, {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
@@ -106,6 +153,8 @@
       #${PANEL_ID} .np-times{display:flex;justify-content:space-between;color:#9ca3af;font-size:10px;margin-top:3px}
       #${PANEL_ID} .np-footer{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:11px}
       #${PANEL_ID} .np-placeholder{padding:15px;border:1px dashed rgba(168,85,247,.45);border-radius:13px;color:#c4b5fd;line-height:1.45;background:rgba(124,58,237,.08)}
+      #${PANEL_ID} .np-viz{height:26px;margin-top:9px;padding:5px 8px;display:flex;align-items:end;gap:4px;border-radius:9px;background:rgba(255,255,255,.025);overflow:hidden}
+      #${PANEL_ID} .np-viz span{display:block;flex:1;min-height:3px;border-radius:999px;background:linear-gradient(180deg,#22d3ee,#8b5cf6,#ec4899);transform-origin:bottom;transition:height .16s ease,filter .16s ease}
       #${LYRICS_ID}{position:fixed;z-index:2147483644;width:min(470px,calc(100vw - 24px));height:min(78vh,800px);left:24px;top:110px;background:rgba(7,9,18,.98);color:#fff;border:1px solid rgba(34,211,238,.78);border-radius:18px;box-shadow:0 0 30px rgba(34,211,238,.34),0 18px 55px rgba(0,0,0,.5);font:13px Arial,sans-serif;overflow:hidden;display:none}
       #${LYRICS_ID} *{box-sizing:border-box}
       #${LYRICS_ID} .np-lyrics-head{padding:11px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed,#db2777);display:flex;justify-content:space-between;align-items:center;font-weight:900;cursor:move;user-select:none}
@@ -117,10 +166,8 @@
       #${LYRICS_ID} .np-lyrics-artist{margin-top:4px;color:#b8c2d5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       #${LYRICS_ID} .np-lyrics-body{margin:12px;height:calc(100% - 134px);padding:14px;border:1px solid rgba(34,211,238,.2);border-radius:12px;background:rgba(1,4,12,.65);overflow:auto;white-space:pre-wrap;line-height:1.58;color:#eef5ff}
       #${LYRICS_ID} .np-lyrics-empty{color:#b8c2d5;line-height:1.55}
-      .nova-player-rgb #${PANEL_ID},.nova-player-rgb #${LYRICS_ID}{animation:np-rgb-pulse 7s linear infinite;border-color:#f0abfc}
-      .nova-player-rgb #${PANEL_ID} .np-head,.nova-player-rgb #${LYRICS_ID} .np-lyrics-head{background:linear-gradient(90deg,#ef4444,#f59e0b,#22c55e,#06b6d4,#8b5cf6,#ec4899);background-size:300% 100%;animation:np-rgb-flow 6s linear infinite}
-      @keyframes np-rgb-flow{to{background-position:300% 0}}
-      @keyframes np-rgb-pulse{50%{box-shadow:0 0 40px rgba(244,114,182,.55),0 18px 55px rgba(0,0,0,.5)}}
+      #${PANEL_ID}.np-rgb,#${LYRICS_ID}.np-rgb{background:radial-gradient(circle at 15% 0%,hsla(var(--np-h1,188),96%,58%,.14),transparent 34%),radial-gradient(circle at 94% 16%,hsla(var(--np-h2,264),96%,58%,.12),transparent 39%),rgba(7,9,18,.98)}
+      #${PANEL_ID}.np-rgb .np-head,#${LYRICS_ID}.np-rgb .np-lyrics-head{background:linear-gradient(90deg,hsla(var(--np-h1,188),88%,45%,.95),hsla(var(--np-h2,264),82%,48%,.95),hsla(var(--np-h3,322),84%,48%,.95))}
     `;
     (document.head || document.documentElement).appendChild(style);
   }
@@ -177,6 +224,7 @@
 
     const seek = node('input', { type: 'range', attrs: { min: 0, max: Math.max(1, duration), step: 1, value: current }, dataset: { range: 'seek' } });
     body.append(node('div', { style: 'margin-top:11px' }, [seek, node('div', { className: 'np-times' }, [node('span', { text: formatTime(current) }), node('span', { text: formatTime(duration) })])]));
+    body.appendChild(visualizer(s.audio || {}));
 
     body.appendChild(node('div', { className: 'np-row' }, [
       node('button', { text: 'Shuffle', type: 'button', dataset: { action: 'shuffle' } }),
@@ -211,6 +259,7 @@
     body.replaceChildren(sourceButtons());
     if (state.source === 'suno') renderSuno(body);
     else renderYtm(body);
+    applyReactiveVisuals();
   }
 
   function currentYtmState() {
@@ -316,7 +365,11 @@
     }
     const action = button.dataset.np || button.dataset.action;
     if (action === 'close') hide();
-    else if (action === 'rgb') document.body.classList.toggle('nova-player-rgb');
+    else if (action === 'rgb') {
+      state.rgb = !state.rgb;
+      writeLocal(RGB_KEY, String(state.rgb));
+      applyReactiveVisuals();
+    }
     else if (['previous','play-pause','next','shuffle','repeat','mute'].includes(action)) send(action);
     else if (action === 'lyrics') openLyrics();
     else if (action === 'open-ytm') window.open('https://music.youtube.com/', '_blank');
@@ -435,6 +488,7 @@
     state.ytm = gmGet(STATE_KEY, null);
     if (state.visible && state.source === 'youtube-music') render();
     if (state.lyricsVisible) renderLyrics();
+    applyReactiveVisuals();
   }
 
   function show() {
