@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Suno Remote - Any Page v0.12
 // @namespace    nova.suno.remote.anypage
-// @version      0.1.152
+// @version      0.1.153
 // @description  Pocket Gremlin Edition: read-only Suno remote with full-library prime capture, lyrics reader, RGB Lab, and audio-reactive playback UI.
 // @author       Cody / Codex + kivkumah + Nova
 // @match        *://*/*
@@ -36,7 +36,7 @@
   if (window.top !== window.self) return;
   if (window.NovaSunoRemoteAnyPage) return;
 
-  const VERSION = '0.1.152';
+  const VERSION = '0.1.153';
   const API = 'https://studio-api-prod.suno.com';
   const IS_SUNO = location.hostname === 'suno.com' || location.hostname.endsWith('.suno.com');
   const PRIME_PARAM = 'nova_suno_prime';
@@ -2206,13 +2206,17 @@
   }
 
   function bodyToText(body) {
-    if (body == null) return '';
-    if (typeof body === 'string') return body;
-    if (body instanceof URLSearchParams) return body.toString();
-    if (body instanceof FormData) return '';
-    if (body instanceof Blob) return '';
-    if (typeof body === 'object') return JSON.stringify(body);
-    return String(body || '');
+    // A Prime popup is executed through Bootstrap's Firefox sandbox bridge.
+    // Cross-realm `instanceof` checks can throw before Suno's response is read.
+    try {
+      if (body == null) return '';
+      if (typeof body === 'string') return body;
+      if (typeof body === 'object') return JSON.stringify(body);
+      return String(body);
+    } catch (_) {
+      // Request bodies only improve full-library paging. Never let one stop capture.
+      return '';
+    }
   }
 
   function saveRecipeFromText(url, bodyText) {
