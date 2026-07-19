@@ -5,7 +5,7 @@
 
   if (window.NovaYouTubeMusicAdapter) return;
 
-  const VERSION = '1.2.0';
+  const VERSION = '1.2.1';
   const STATE_KEY = 'nova.ytm.state.v1';
   const COMMAND_KEY = 'nova.ytm.command.v1';
   const IS_YTM = location.hostname === 'music.youtube.com';
@@ -226,6 +226,11 @@
         lastLyricsReadAt = 0;
         setTimeout(publish, 650);
         setTimeout(publish, 1600);
+        break;
+      case 'audio-settings':
+        if (window.NovaAudioTheme && typeof window.NovaAudioTheme.setSettings === 'function' && command.value) {
+          window.NovaAudioTheme.setSettings(command.value);
+        }
         break;
     }
 
