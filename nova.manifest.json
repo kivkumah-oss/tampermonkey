@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2.6.30",
-  "updatedAt": "2026-07-20T19:55:00Z",
+  "version": "2.6.31",
+  "updatedAt": "2026-07-20T20:10:00Z",
   "bootstrapMinVersion": "2.2.5",
   "core": [
     {
@@ -226,19 +226,6 @@
       "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js"
     },
     {
-      "id": "nova-default-module-state",
-      "name": "Nova Default Module State",
-      "description": "Actively starts HERO and POPS on matching pages by default, while preserving the user's choice to turn either module off.",
-      "version": "1.1.0",
-      "order": 145,
-      "required": true,
-      "enabled": true,
-      "core": true,
-      "type": "core",
-      "api": "NovaDefaultModuleState",
-      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-default-module-state.js"
-    },
-    {
       "id": "nova-module-loader",
       "name": "Nova Module Loader",
       "description": "Downloads, caches, updates, launches, and persistently restores Nova modules across refreshes and matching pages.",
@@ -250,6 +237,19 @@
       "type": "core",
       "api": "NovaModuleLoader",
       "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js"
+    },
+    {
+      "id": "nova-default-module-state",
+      "name": "Nova Default Site Modules",
+      "description": "Starts HERO and POPS after the module loader is ready on every matching page, while preserving the user's OFF choice.",
+      "version": "1.2.0",
+      "order": 160,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaDefaultModuleState",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-default-module-state.js"
     }
   ],
   "modules": [
