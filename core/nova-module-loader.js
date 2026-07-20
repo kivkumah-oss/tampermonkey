@@ -5,18 +5,23 @@
 
   if (window.NovaModuleLoader) return;
 
-  const VERSION = '1.1.7';
+  const VERSION = '1.2.0';
   const loaded = new Set();
   const loading = new Map();
   const LOADED_MODULES_ATTR = 'data-nova-loaded-modules';
   const BOOTSTRAP_PREFIX = 'nova.bootstrap.v2.';
   const BOOTSTRAP_CACHE_INDEX_KEY = BOOTSTRAP_PREFIX + 'cache.index';
   const BOOTSTRAP_MAX_CACHE_ENTRIES = 80;
+  const VISIBILITY_STATE_KEY = 'nova.modules.visibility.v1';
+  const RESTORE_REFRESH_DELAYS = [180, 900];
 
   function publishLoadedModules() {
     try {
       if (document.documentElement) {
-        document.documentElement.setAttribute(LOADED_MODULES_ATTR, JSON.stringify([...loaded]));
+        document.documentElement.setAttribute(
+          LOADED_MODULES_ATTR,
+          JSON.stringify([...loaded])
+        );
       }
     } catch (_) {}
   }
@@ -105,13 +110,20 @@
 
   function getRegistry() {
     try {
-      if (window.Nova && Array.isArray(window.Nova.modulesRegistry) && window.Nova.modulesRegistry.length) {
+      if (
+        window.Nova &&
+        Array.isArray(window.Nova.modulesRegistry) &&
+        window.Nova.modulesRegistry.length
+      ) {
         return window.Nova.modulesRegistry.slice();
       }
     } catch (_) {}
 
     try {
-      if (window.NovaBootstrap && typeof window.NovaBootstrap.getManifest === 'function') {
+      if (
+        window.NovaBootstrap &&
+        typeof window.NovaBootstrap.getManifest === 'function'
+      ) {
         const manifest = window.NovaBootstrap.getManifest();
         if (manifest) {
           return [
@@ -123,7 +135,9 @@
     } catch (_) {}
 
     try {
-      const raw = document.documentElement && document.documentElement.getAttribute('data-nova-manifest');
+      const raw =
+        document.documentElement &&
+        document.documentElement.getAttribute('data-nova-manifest');
       const manifest = raw && JSON.parse(raw);
       if (manifest) {
         return [
@@ -202,10 +216,61 @@
     }
   }
 
-  function mirrorIntoBootstrapCache(module, code) {
-    if (!module || !module.id || typeof code !== 'string' || !code.trim()) return false;
+  function readVisibilityState() {
+    const value = readGmJson(VISIBILITY_STATE_KEY, {});
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? { ...value }
+      : {};
+  }
 
-    const cacheKey = BOOTSTRAP_PREFIX + 'code.module.' + safeCacheId(module.id) + '.' + safeCacheId(module.version || 'latest');
+  function getVisibilityPreference(moduleId) {
+    const state = readVisibilityState();
+    if (!Object.prototype.hasOwnProperty.call(state, moduleId)) return null;
+    return state[moduleId] === true;
+  }
+
+  function setVisibilityPreference(moduleId, visible) {
+    if (!moduleId) return false;
+    const state = readVisibilityState();
+    state[moduleId] = Boolean(visible);
+    return writeGmValue(VISIBILITY_STATE_KEY, state);
+  }
+
+  function clearVisibilityPreference(moduleId) {
+    if (!moduleId) return false;
+    const state = readVisibilityState();
+    if (!Object.prototype.hasOwnProperty.call(state, moduleId)) return true;
+    delete state[moduleId];
+    return writeGmValue(VISIBILITY_STATE_KEY, state);
+  }
+
+  function shouldRestore(module) {
+    if (!module || !module.id || module.enabled === false || module.core) return false;
+
+    const preference = getVisibilityPreference(module.id);
+    if (preference === false) return false;
+    if (preference === true) return canManuallyLoad(module);
+
+    return module.autoload === true && canLoad(module);
+  }
+
+  function isDesiredVisible(moduleId) {
+    const module = getRegistry().find((item) => item && item.id === moduleId);
+    return module ? shouldRestore(module) : false;
+  }
+
+  function mirrorIntoBootstrapCache(module, code) {
+    if (!module || !module.id || typeof code !== 'string' || !code.trim()) {
+      return false;
+    }
+
+    const cacheKey =
+      BOOTSTRAP_PREFIX +
+      'code.module.' +
+      safeCacheId(module.id) +
+      '.' +
+      safeCacheId(module.version || 'latest');
+
     const cached = {
       id: module.id,
       version: module.version || 'latest',
@@ -218,8 +283,9 @@
     if (!writeGmValue(cacheKey, cached)) return false;
 
     const index = readGmJson(BOOTSTRAP_CACHE_INDEX_KEY, []);
-    const next = (Array.isArray(index) ? index : [])
-      .filter((entry) => entry && entry.key !== cacheKey);
+    const next = (Array.isArray(index) ? index : []).filter(
+      (entry) => entry && entry.key !== cacheKey
+    );
     next.unshift({ key: cacheKey, touchedAt: Date.now() });
 
     while (next.length > BOOTSTRAP_MAX_CACHE_ENTRIES) {
@@ -228,12 +294,19 @@
     }
 
     writeGmValue(BOOTSTRAP_CACHE_INDEX_KEY, next);
-    console.log('[Nova Module Loader] Mirrored module into Bootstrap cache', module.id, module.version || 'latest');
+    console.log(
+      '[Nova Module Loader] Mirrored module into Bootstrap cache',
+      module.id,
+      module.version || 'latest'
+    );
     return true;
   }
 
   async function fetchCode(module) {
-    if (window.NovaBootstrap && typeof window.NovaBootstrap.fetchComponent === 'function') {
+    if (
+      window.NovaBootstrap &&
+      typeof window.NovaBootstrap.fetchComponent === 'function'
+    ) {
       const code = await window.NovaBootstrap.fetchComponent(module, {
         kind: 'module',
         preferCache: true
@@ -244,7 +317,9 @@
 
     const version = encodeURIComponent(module.version || 'latest');
     const joiner = module.url.includes('?') ? '&' : '?';
-    const response = await fetch(module.url + joiner + 'v=' + version, { cache: 'no-store' });
+    const response = await fetch(module.url + joiner + 'v=' + version, {
+      cache: 'no-store'
+    });
     if (!response.ok) throw new Error('HTTP ' + response.status);
     const code = await response.text();
     mirrorIntoBootstrapCache(module, code);
@@ -252,9 +327,14 @@
   }
 
   function execute(module, code) {
-    if (!code || typeof code !== 'string') throw new Error('Empty module source');
+    if (!code || typeof code !== 'string') {
+      throw new Error('Empty module source');
+    }
 
-    if (window.NovaBootstrap && typeof window.NovaBootstrap.executeCode === 'function') {
+    if (
+      window.NovaBootstrap &&
+      typeof window.NovaBootstrap.executeCode === 'function'
+    ) {
       window.NovaBootstrap.executeCode(module, code, 'module');
       return;
     }
@@ -270,14 +350,19 @@
       'unsafeWindow',
       code + '\n//# sourceURL=' + sourceUrl
     );
+
     runner.call(
       window,
       typeof GM_xmlhttpRequest === 'function' ? GM_xmlhttpRequest : undefined,
       typeof GM_getValue === 'function' ? GM_getValue : undefined,
       typeof GM_setValue === 'function' ? GM_setValue : undefined,
       typeof GM_deleteValue === 'function' ? GM_deleteValue : undefined,
-      typeof GM_addValueChangeListener === 'function' ? GM_addValueChangeListener : undefined,
-      typeof GM_registerMenuCommand === 'function' ? GM_registerMenuCommand : undefined,
+      typeof GM_addValueChangeListener === 'function'
+        ? GM_addValueChangeListener
+        : undefined,
+      typeof GM_registerMenuCommand === 'function'
+        ? GM_registerMenuCommand
+        : undefined,
       typeof unsafeWindow !== 'undefined' ? unsafeWindow : window
     );
   }
@@ -306,7 +391,11 @@
         }
 
         markLoaded(module.id);
-        console.log('[Nova Module Loader] Loaded', module.id, module.version || 'latest');
+        console.log(
+          '[Nova Module Loader] Loaded',
+          module.id,
+          module.version || 'latest'
+        );
 
         emit('module-loaded', 'Nova module loaded: ' + module.id, {
           id: module.id,
@@ -324,12 +413,16 @@
             error
           );
 
-          emit('module-loaded', 'Nova module loaded with a sandbox compatibility warning: ' + module.id, {
-            id: module.id,
-            version: module.version || null,
-            url: module.url,
-            warning: String(error)
-          });
+          emit(
+            'module-loaded',
+            'Nova module loaded with a sandbox compatibility warning: ' + module.id,
+            {
+              id: module.id,
+              version: module.version || null,
+              url: module.url,
+              warning: String(error)
+            }
+          );
 
           return true;
         }
@@ -351,33 +444,125 @@
     return promise;
   }
 
+  function callApiMethod(module, method) {
+    try {
+      const api = module && module.api && window[module.api];
+      if (!api || typeof api[method] !== 'function') return false;
+      api[method]();
+      return true;
+    } catch (error) {
+      console.warn(
+        '[Nova Module Loader] Module API method failed',
+        module && module.id,
+        method,
+        error
+      );
+      return false;
+    }
+  }
+
+  function scheduleRefresh(module) {
+    for (const delay of RESTORE_REFRESH_DELAYS) {
+      setTimeout(() => {
+        if (!isDesiredVisible(module.id)) return;
+        callApiMethod(module, 'show');
+        callApiMethod(module, 'refresh');
+      }, delay);
+    }
+  }
+
+  async function activateModule(module, options = {}) {
+    if (!module) return false;
+    const manual = options.manual === true;
+    const ok = await loadScript(module, { manual });
+    if (!ok) return false;
+
+    callApiMethod(module, 'show');
+    callApiMethod(module, 'refresh');
+    scheduleRefresh(module);
+    return true;
+  }
+
   async function loadMatching() {
     const registry = getRegistry();
-    const autoload = registry.filter((module) => module && module.autoload === true && canLoad(module));
-    const results = [];
+    const candidates = registry
+      .filter((module) => module && shouldRestore(module))
+      .sort((a, b) => {
+        const aSpecific = Array.isArray(a.match) && a.match.length ? 1 : 0;
+        const bSpecific = Array.isArray(b.match) && b.match.length ? 1 : 0;
+        return bSpecific - aSpecific;
+      });
 
-    for (const module of autoload) {
-      results.push(await loadScript(module));
+    const results = await Promise.allSettled(
+      candidates.map((module) =>
+        activateModule(module, {
+          manual: getVisibilityPreference(module.id) === true
+        })
+      )
+    );
+
+    return results.filter(
+      (result) => result.status === 'fulfilled' && result.value === true
+    ).length;
+  }
+
+  async function setVisible(moduleOrId, visible, options = {}) {
+    const module =
+      typeof moduleOrId === 'string'
+        ? getRegistry().find((item) => item && item.id === moduleOrId)
+        : moduleOrId;
+
+    if (!module || !module.id) return false;
+    setVisibilityPreference(module.id, visible);
+
+    if (!visible) {
+      callApiMethod(module, 'hide');
+      emit('module-hidden', 'Nova module hidden: ' + module.id, {
+        id: module.id,
+        persisted: true
+      });
+      return true;
     }
 
-    return results.filter(Boolean).length;
+    const ok = await activateModule(module, { manual: true });
+    if (ok) {
+      emit('module-visible', 'Nova module restored: ' + module.id, {
+        id: module.id,
+        persisted: true,
+        source: options.source || 'api'
+      });
+    }
+    return ok;
   }
 
   function handleModuleCommand(event) {
     const detail = event && event.detail;
-    if (!detail || !detail.id || !['launch', 'hide'].includes(detail.action)) return;
+    if (!detail || !detail.id || !['launch', 'hide'].includes(detail.action)) {
+      return;
+    }
 
     const module = getRegistry().find((item) => item && item.id === detail.id);
-    if (!module || !canManuallyLoad(module)) return;
+    if (!module) return;
 
-    Promise.resolve(loadScript(module, { manual: true })).then((ok) => {
-      const api = module.api && window[module.api];
-      const method = detail.action === 'hide' ? 'hide' : 'show';
-      if (ok && api && typeof api[method] === 'function') api[method]();
-      safeDispatch('nova-module-command-result', { id: module.id, action: detail.action, ok: Boolean(ok) });
-    }).catch((error) => {
-      safeDispatch('nova-module-command-result', { id: module.id, action: detail.action, ok: false, error: String(error) });
-    });
+    const visible = detail.action === 'launch';
+    Promise.resolve(setVisible(module, visible, { source: 'menu' }))
+      .then((ok) => {
+        safeDispatch('nova-module-command-result', {
+          id: module.id,
+          action: detail.action,
+          ok: Boolean(ok),
+          persisted: true
+        });
+      })
+      .catch((error) => {
+        safeDispatch('nova-module-command-result', {
+          id: module.id,
+          action: detail.action,
+          ok: false,
+          persisted: false,
+          error: String(error)
+        });
+      });
   }
 
   installEventBridge();
@@ -392,7 +577,16 @@
     canManuallyLoad,
     getRegistry,
     loadMatching,
+    restoreMatching: loadMatching,
     loadScript,
+    activateModule,
+    setVisible,
+    shouldRestore,
+    isDesiredVisible,
+    getVisibilityPreference,
+    setVisibilityPreference,
+    clearVisibilityPreference,
+    readVisibilityState,
     installEventBridge,
     safeDispatch,
     mirrorIntoBootstrapCache,
@@ -401,11 +595,19 @@
       if (!module || !module.id) return false;
       markUnloaded(module.id);
 
-      if (window.NovaBootstrap && typeof window.NovaBootstrap.clearComponentCache === 'function') {
+      if (
+        window.NovaBootstrap &&
+        typeof window.NovaBootstrap.clearComponentCache === 'function'
+      ) {
         await window.NovaBootstrap.clearComponentCache(module, 'module');
       }
 
-      return loadScript(module);
+      const ok = await loadScript(module, { manual: true });
+      if (ok && shouldRestore(module)) {
+        callApiMethod(module, 'show');
+        callApiMethod(module, 'refresh');
+      }
+      return ok;
     }
   };
 
