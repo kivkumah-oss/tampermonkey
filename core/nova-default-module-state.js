@@ -4,13 +4,14 @@
 
   if (window.NovaDefaultModuleState) return;
 
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.0';
   const VISIBILITY_STATE_KEY = 'nova.modules.visibility.v1';
   const MIGRATION_MARKER_KEY = 'nova.modules.defaults.hero-pops.v1.applied';
   const DEFAULT_ON_MODULES = [
     'nova-hero-intelligence',
     'nova-pops-modern-ui'
   ];
+  const START_DELAYS = [0, 250, 1000, 2500, 6000];
 
   function readValue(key, fallback) {
     try {
@@ -32,6 +33,25 @@
     }
   }
 
+  function readVisibilityState() {
+    const value = readValue(VISIBILITY_STATE_KEY, {});
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? { ...value }
+      : {};
+  }
+
+  function getPreference(moduleId) {
+    const state = readVisibilityState();
+    if (!Object.prototype.hasOwnProperty.call(state, moduleId)) return null;
+    return state[moduleId] === true;
+  }
+
+  function setPreference(moduleId, visible) {
+    const state = readVisibilityState();
+    state[moduleId] = Boolean(visible);
+    return writeValue(VISIBILITY_STATE_KEY, state);
+  }
+
   function applyDefaults(options = {}) {
     const force = options.force === true;
     const alreadyApplied = readValue(MIGRATION_MARKER_KEY, false) === true;
@@ -40,15 +60,12 @@
       return {
         applied: false,
         reason: 'already-applied',
-        defaults: DEFAULT_ON_MODULES.slice()
+        defaults: DEFAULT_ON_MODULES.slice(),
+        state: readVisibilityState()
       };
     }
 
-    const current = readValue(VISIBILITY_STATE_KEY, {});
-    const next = current && typeof current === 'object' && !Array.isArray(current)
-      ? { ...current }
-      : {};
-
+    const next = readVisibilityState();
     for (const moduleId of DEFAULT_ON_MODULES) {
       next[moduleId] = true;
     }
@@ -64,21 +81,106 @@
     };
   }
 
+  function matchOne(pattern) {
+    const value = String(pattern || '');
+    if (!value) return true;
+    if (value.endsWith('*')) return location.href.startsWith(value.slice(0, -1));
+    return location.href === value || location.href.startsWith(value);
+  }
+
+  function matches(module) {
+    if (!module || !Array.isArray(module.match) || !module.match.length) return true;
+    return module.match.some(matchOne);
+  }
+
+  function getRegistry() {
+    try {
+      if (window.Nova && Array.isArray(window.Nova.modulesRegistry)) {
+        return window.Nova.modulesRegistry.slice();
+      }
+    } catch (_) {}
+
+    try {
+      const manifest = window.NovaBootstrap?.getManifest?.();
+      if (manifest && Array.isArray(manifest.modules)) {
+        return manifest.modules.map((item) => ({ ...item, core: false }));
+      }
+    } catch (_) {}
+
+    return [];
+  }
+
+  async function startMatching(reason = 'scheduled') {
+    const loader = window.NovaModuleLoader;
+    if (!loader || typeof loader.setVisible !== 'function') {
+      return { started: 0, reason: 'loader-not-ready' };
+    }
+
+    const registry = getRegistry();
+    let started = 0;
+
+    for (const moduleId of DEFAULT_ON_MODULES) {
+      const module = registry.find((item) => item && item.id === moduleId);
+      if (!module || !matches(module)) continue;
+
+      const preference = getPreference(moduleId);
+      if (preference === false) continue;
+      if (preference === null) setPreference(moduleId, true);
+
+      try {
+        const ok = await loader.setVisible(module, true, {
+          source: 'default-autostart:' + reason
+        });
+
+        if (ok) {
+          started += 1;
+          const api = module.api && window[module.api];
+          if (api && typeof api.show === 'function') api.show();
+          if (api && typeof api.refresh === 'function') api.refresh();
+        }
+      } catch (error) {
+        console.warn('[Nova Core] Default module autostart failed', moduleId, error);
+      }
+    }
+
+    return { started, reason };
+  }
+
+  function scheduleAutostart(reason = 'boot') {
+    for (const delay of START_DELAYS) {
+      setTimeout(() => {
+        startMatching(reason + ':' + delay).catch(() => {});
+      }, delay);
+    }
+  }
+
   function getStatus() {
     return {
       version: VERSION,
       applied: readValue(MIGRATION_MARKER_KEY, false) === true,
       defaults: DEFAULT_ON_MODULES.slice(),
-      visibilityState: readValue(VISIBILITY_STATE_KEY, {})
+      visibilityState: readVisibilityState(),
+      matching: getRegistry()
+        .filter((item) => DEFAULT_ON_MODULES.includes(item?.id) && matches(item))
+        .map((item) => item.id)
     };
   }
 
   window.NovaDefaultModuleState = {
     version: VERSION,
     applyDefaults,
+    startMatching,
+    scheduleAutostart,
     getStatus
   };
 
   const result = applyDefaults();
   console.log('[Nova Core] Default module state', result);
+
+  scheduleAutostart('core-load');
+  window.addEventListener('load', () => scheduleAutostart('window-load'), { once: true });
+  window.addEventListener('pageshow', () => scheduleAutostart('pageshow'));
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scheduleAutostart('visible');
+  });
 })();
