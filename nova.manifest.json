@@ -1,1 +1,360 @@
-{"schema":1,"version":"2.6.26","updatedAt":"2026-07-20T06:12:48Z","bootstrapMinVersion":"2.2.5","core":[{"id":"nova-trusted-types-runtime","name":"Nova Trusted Types Runtime","description":"Bootstrap-realm Trusted Types compatibility for Nova UI on strict CSP websites.","version":"1.0.0","order":5,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTrustedTypesRuntime","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trusted-types-runtime.js"},{"id":"nova-theme","name":"Nova Theme","description":"Shared colour, layout, RGB, and Nova Player visual-language engine.","version":"1.6.1","order":10,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js"},{"id":"nova-audio-theme","name":"Nova Audio Theme","description":"Reusable bass-reactive audio analyser extracted from Nova Player.","version":"0.1.2","order":20,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaAudioTheme","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-audio-theme.js"},{"id":"nova-session","name":"Nova Session","description":"Persistent investigation session engine used by Nova core and modules.","version":"1.0.0","order":30,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaSession","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js"},{"id":"nova-memory","name":"Nova Memory","description":"Local per-website knowledge store for notes, selectors, endpoints, modules, and findings.","version":"1.0.0","order":40,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMemory","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory.js"},{"id":"nova-trace","name":"Nova Trace","description":"Developer investigation tool for recording safe page activity metadata.","version":"1.0.1","order":50,"required":false,"enabled":true,"core":true,"type":"devkit","api":"NovaTraceNetwork","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js"},{"id":"nova-api-body-catcher","name":"Nova API Body Catcher","description":"Safe API response-body metadata catcher for investigations. Degrades safely when page hooks are unavailable.","version":"1.1.1","order":60,"required":false,"enabled":true,"core":true,"type":"devkit","api":"NovaApiBodyCatcher","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-api-body-catcher.js"},{"id":"nova-dom-inspector","name":"Nova DOM Inspector","description":"Universal page structure inspector for safe DOM metadata snapshots.","version":"1.0.0","order":70,"required":false,"enabled":true,"core":true,"type":"devkit","api":"NovaDOMInspector","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js"},{"id":"nova-investigation-export","name":"Nova Investigation Export","description":"AI-ready export package combining session, trace, DOM, and Nova metadata.","version":"1.0.0","order":80,"required":false,"enabled":true,"core":true,"type":"devkit","api":"NovaInvestigationExport","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js"},{"id":"nova-youtube-music-adapter","name":"Nova YouTube Music Adapter","description":"Guaranteed core-side YouTube Music state, lyric capture, audio settings bridge, and command bridge for cross-tab remote control.","version":"1.2.1","order":85,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaYouTubeMusicAdapter","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-youtube-music-adapter.js"},{"id":"nova-menu","name":"Nova Menu","description":"Single movable Nova orb with Settings, Modules, Advanced, and Info views.","version":"2.3.5","order":90,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMenu","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js"},{"id":"nova-menu-scroll-guard","name":"Nova Menu Scroll Guard","description":"Preserves the Advanced and Modules scroll position at Nova Menu's render boundary.","version":"1.1.0","order":95,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMenuScrollGuard","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu-scroll-guard.js"},{"id":"nova-orb-extras","name":"Nova Orb Extras","description":"Extra Nova orb controls and repair helpers.","version":"1.0.0","order":100,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaOrbExtras","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-orb-extras.js"},{"id":"nova-memory-panel","name":"Nova Memory Panel","description":"Advanced memory panel opened from Nova Advanced.","version":"1.0.0","order":110,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMemoryPanel","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js"},{"id":"nova-memory-autolearn","name":"Nova Memory AutoLearn","description":"Automatic safe learning from DOM and Trace summaries into local website memory.","version":"1.0.0","order":120,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaMemoryAutoLearn","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js"},{"id":"nova-brain","name":"Nova Brain","description":"Local pattern engine that turns DOM, Trace, and Memory summaries into grounded insights and module recommendations.","version":"1.0.0","order":130,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaBrain","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js"},{"id":"nova-window-manager","name":"Nova Window Manager","description":"Shared Nova window discovery and management engine.","version":"1.0.0","order":140,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaWindowManager","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js"},{"id":"nova-module-loader","name":"Nova Module Loader","description":"Downloads, caches, updates, launches Nova modules, bridges Firefox userscript sandbox events, and mirrors modules into Bootstrap cache for document-start capture.","version":"1.1.7","order":150,"required":true,"enabled":true,"core":true,"type":"core","api":"NovaModuleLoader","url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js"}],"modules":[{"id":"nova-player","name":"Nova Player","description":"Single unified Suno and YouTube Music player with shared lyrics, RGB Lab, library controls, and reactive visuals.","version":"0.4.0","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaPlayer","manualAnywhere":true,"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/player/nova-player.js"},{"id":"nova-watch","name":"Nova Watch","description":"Core-dependent live clock with Nova themes, audio-reactive glow, saved layout, settings, and gremlin messages.","version":"1.0.2","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaWatch","requires":["NovaBootstrap","NovaTheme","NovaAudioTheme","NovaModuleLoader"],"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/watch/nova-watch.js"},{"id":"nova-youtube-music-remote","name":"Nova YouTube Music Remote (Legacy)","description":"Legacy standalone YouTube Music remote retained as a fallback during Nova Player migration.","version":"0.1.0","type":"module","enabled":false,"autoload":false,"core":false,"api":"NovaYouTubeMusicRemote","manualAnywhere":true,"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/youtube-music/nova-youtube-music-remote.js"},{"id":"nova-suno-prime-fallback","name":"Nova Suno Prime Fallback","description":"Active authenticated Suno feed capture used only inside Prime popup windows when passive page interception misses the request.","version":"0.1.0","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaSunoPrimeFallback","match":["https://suno.com/*"],"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-prime-fallback.js"},{"id":"nova-suno-remote-any-page","name":"Nova Suno Engine","description":"Suno library, Prime capture, and playback engine used inside Nova Player; standalone UI remains an emergency fallback.","version":"0.1.155","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaSunoRemoteAnyPage","manualAnywhere":true,"match":["https://suno.com/*"],"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-remote-any-page.js"},{"id":"nova-hero-intelligence","name":"Nova HERO Intelligence","description":"HERO shipment journey console with ATROPS drawer, dwell actors, investigation cards, and clickable process stages.","version":"0.1.0","type":"module","enabled":true,"autoload":true,"core":false,"api":"NovaHeroIntelligence","match":["https://hero.eu.picking.aft.a2z.com/*"],"requires":["NovaBootstrap","NovaTheme","NovaModuleLoader"],"url":"https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/hero/nova-hero-intelligence.js"}]}
+{
+  "schema": 1,
+  "version": "2.6.27",
+  "updatedAt": "2026-07-20T16:33:43Z",
+  "bootstrapMinVersion": "2.2.5",
+  "core": [
+    {
+      "id": "nova-trusted-types-runtime",
+      "name": "Nova Trusted Types Runtime",
+      "description": "Bootstrap-realm Trusted Types compatibility for Nova UI on strict CSP websites.",
+      "version": "1.0.0",
+      "order": 5,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaTrustedTypesRuntime",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trusted-types-runtime.js"
+    },
+    {
+      "id": "nova-theme",
+      "name": "Nova Theme",
+      "description": "Shared colour, layout, RGB, and Nova Player visual-language engine.",
+      "version": "1.6.1",
+      "order": 10,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaTheme",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-theme.js"
+    },
+    {
+      "id": "nova-audio-theme",
+      "name": "Nova Audio Theme",
+      "description": "Reusable bass-reactive audio analyser extracted from Nova Player.",
+      "version": "0.1.2",
+      "order": 20,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaAudioTheme",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-audio-theme.js"
+    },
+    {
+      "id": "nova-session",
+      "name": "Nova Session",
+      "description": "Persistent investigation session engine used by Nova core and modules.",
+      "version": "1.0.0",
+      "order": 30,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaSession",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-session.js"
+    },
+    {
+      "id": "nova-memory",
+      "name": "Nova Memory",
+      "description": "Local per-website knowledge store for notes, selectors, endpoints, modules, and findings.",
+      "version": "1.0.0",
+      "order": 40,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaMemory",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory.js"
+    },
+    {
+      "id": "nova-trace",
+      "name": "Nova Trace",
+      "description": "Developer investigation tool for recording safe page activity metadata.",
+      "version": "1.0.1",
+      "order": 50,
+      "required": false,
+      "enabled": true,
+      "core": true,
+      "type": "devkit",
+      "api": "NovaTraceNetwork",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-trace.js"
+    },
+    {
+      "id": "nova-api-body-catcher",
+      "name": "Nova API Body Catcher",
+      "description": "Safe API response-body metadata catcher for investigations. Degrades safely when page hooks are unavailable.",
+      "version": "1.1.1",
+      "order": 60,
+      "required": false,
+      "enabled": true,
+      "core": true,
+      "type": "devkit",
+      "api": "NovaApiBodyCatcher",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-api-body-catcher.js"
+    },
+    {
+      "id": "nova-dom-inspector",
+      "name": "Nova DOM Inspector",
+      "description": "Universal page structure inspector for safe DOM metadata snapshots.",
+      "version": "1.0.0",
+      "order": 70,
+      "required": false,
+      "enabled": true,
+      "core": true,
+      "type": "devkit",
+      "api": "NovaDOMInspector",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-dom-inspector.js"
+    },
+    {
+      "id": "nova-investigation-export",
+      "name": "Nova Investigation Export",
+      "description": "AI-ready export package combining session, trace, DOM, and Nova metadata.",
+      "version": "1.0.0",
+      "order": 80,
+      "required": false,
+      "enabled": true,
+      "core": true,
+      "type": "devkit",
+      "api": "NovaInvestigationExport",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-investigation-export.js"
+    },
+    {
+      "id": "nova-youtube-music-adapter",
+      "name": "Nova YouTube Music Adapter",
+      "description": "Guaranteed core-side YouTube Music state, lyric capture, audio settings bridge, and command bridge for cross-tab remote control.",
+      "version": "1.2.1",
+      "order": 85,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaYouTubeMusicAdapter",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-youtube-music-adapter.js"
+    },
+    {
+      "id": "nova-menu",
+      "name": "Nova Menu",
+      "description": "Single movable Nova orb with Settings, Modules, Advanced, and Info views.",
+      "version": "2.3.5",
+      "order": 90,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaMenu",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu.js"
+    },
+    {
+      "id": "nova-menu-scroll-guard",
+      "name": "Nova Menu Scroll Guard",
+      "description": "Preserves the Advanced and Modules scroll position at Nova Menu's render boundary.",
+      "version": "1.1.0",
+      "order": 95,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaMenuScrollGuard",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-menu-scroll-guard.js"
+    },
+    {
+      "id": "nova-orb-extras",
+      "name": "Nova Orb Extras",
+      "description": "Extra Nova orb controls and repair helpers.",
+      "version": "1.0.0",
+      "order": 100,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaOrbExtras",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-orb-extras.js"
+    },
+    {
+      "id": "nova-memory-panel",
+      "name": "Nova Memory Panel",
+      "description": "Advanced memory panel opened from Nova Advanced.",
+      "version": "1.0.0",
+      "order": 110,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaMemoryPanel",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-panel.js"
+    },
+    {
+      "id": "nova-memory-autolearn",
+      "name": "Nova Memory AutoLearn",
+      "description": "Automatic safe learning from DOM and Trace summaries into local website memory.",
+      "version": "1.0.0",
+      "order": 120,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaMemoryAutoLearn",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-memory-autolearn.js"
+    },
+    {
+      "id": "nova-brain",
+      "name": "Nova Brain",
+      "description": "Local pattern engine that turns DOM, Trace, and Memory summaries into grounded insights and module recommendations.",
+      "version": "1.0.0",
+      "order": 130,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaBrain",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-brain.js"
+    },
+    {
+      "id": "nova-window-manager",
+      "name": "Nova Window Manager",
+      "description": "Shared Nova window discovery and management engine.",
+      "version": "1.0.0",
+      "order": 140,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaWindowManager",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-window-manager.js"
+    },
+    {
+      "id": "nova-module-loader",
+      "name": "Nova Module Loader",
+      "description": "Downloads, caches, updates, launches Nova modules, bridges Firefox userscript sandbox events, and mirrors modules into Bootstrap cache for document-start capture.",
+      "version": "1.1.7",
+      "order": 150,
+      "required": true,
+      "enabled": true,
+      "core": true,
+      "type": "core",
+      "api": "NovaModuleLoader",
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/core/nova-module-loader.js"
+    }
+  ],
+  "modules": [
+    {
+      "id": "nova-player",
+      "name": "Nova Player",
+      "description": "Single unified Suno and YouTube Music player with shared lyrics, RGB Lab, library controls, and reactive visuals.",
+      "version": "0.4.0",
+      "type": "module",
+      "enabled": true,
+      "autoload": true,
+      "core": false,
+      "api": "NovaPlayer",
+      "manualAnywhere": true,
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/player/nova-player.js"
+    },
+    {
+      "id": "nova-watch",
+      "name": "Nova Watch",
+      "description": "Core-dependent live clock with Nova themes, audio-reactive glow, saved layout, settings, and gremlin messages.",
+      "version": "1.0.2",
+      "type": "module",
+      "enabled": true,
+      "autoload": true,
+      "core": false,
+      "api": "NovaWatch",
+      "requires": [
+        "NovaBootstrap",
+        "NovaTheme",
+        "NovaAudioTheme",
+        "NovaModuleLoader"
+      ],
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/watch/nova-watch.js"
+    },
+    {
+      "id": "nova-youtube-music-remote",
+      "name": "Nova YouTube Music Remote (Legacy)",
+      "description": "Legacy standalone YouTube Music remote retained as a fallback during Nova Player migration.",
+      "version": "0.1.0",
+      "type": "module",
+      "enabled": false,
+      "autoload": false,
+      "core": false,
+      "api": "NovaYouTubeMusicRemote",
+      "manualAnywhere": true,
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/youtube-music/nova-youtube-music-remote.js"
+    },
+    {
+      "id": "nova-suno-prime-fallback",
+      "name": "Nova Suno Prime Fallback",
+      "description": "Active authenticated Suno feed capture used only inside Prime popup windows when passive page interception misses the request.",
+      "version": "0.1.0",
+      "type": "module",
+      "enabled": true,
+      "autoload": true,
+      "core": false,
+      "api": "NovaSunoPrimeFallback",
+      "match": [
+        "https://suno.com/*"
+      ],
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-prime-fallback.js"
+    },
+    {
+      "id": "nova-suno-remote-any-page",
+      "name": "Nova Suno Engine",
+      "description": "Suno library, Prime capture, and playback engine used inside Nova Player; standalone UI remains an emergency fallback.",
+      "version": "0.1.155",
+      "type": "module",
+      "enabled": true,
+      "autoload": true,
+      "core": false,
+      "api": "NovaSunoRemoteAnyPage",
+      "manualAnywhere": true,
+      "match": [
+        "https://suno.com/*"
+      ],
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/suno/nova-suno-remote-any-page.js"
+    },
+    {
+      "id": "nova-hero-intelligence",
+      "name": "Nova HERO Intelligence",
+      "description": "HERO shipment journey console with ATROPS drawer, dwell actors, investigation cards, and clickable process stages.",
+      "version": "0.1.0",
+      "type": "module",
+      "enabled": true,
+      "autoload": true,
+      "core": false,
+      "api": "NovaHeroIntelligence",
+      "match": [
+        "https://hero.eu.picking.aft.a2z.com/*"
+      ],
+      "requires": [
+        "NovaBootstrap",
+        "NovaTheme",
+        "NovaModuleLoader"
+      ],
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/hero/nova-hero-intelligence.js"
+    },
+    {
+      "id": "nova-pops-modern-ui",
+      "name": "Nova POPS Modern UI",
+      "description": "Modern centred POPS header, gradient workflow cards, ready-state highlighting, saved colour settings, and protected Nova UI styling.",
+      "version": "1.0.0",
+      "type": "module",
+      "enabled": true,
+      "autoload": true,
+      "core": false,
+      "api": "NovaPopsModernUI",
+      "match": [
+        "https://aft-pops.eu.aft.amazonoperations.app/*",
+        "https://aft-pops-dub.aka.amazon.com/*"
+      ],
+      "requires": [
+        "NovaBootstrap",
+        "NovaTheme",
+        "NovaModuleLoader"
+      ],
+      "url": "https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/pops/nova-pops-modern-ui.js"
+    }
+  ]
+}
