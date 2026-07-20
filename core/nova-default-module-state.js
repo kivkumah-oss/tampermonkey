@@ -4,14 +4,14 @@
 
   if (window.NovaDefaultModuleState) return;
 
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
   const VISIBILITY_STATE_KEY = 'nova.modules.visibility.v1';
   const MIGRATION_MARKER_KEY = 'nova.modules.defaults.hero-pops.v1.applied';
   const DEFAULT_ON_MODULES = [
     'nova-hero-intelligence',
     'nova-pops-modern-ui'
   ];
-  const START_DELAYS = [0, 250, 1000, 2500, 6000];
+  const RETRY_DELAYS = [300, 1200, 3000, 7000];
 
   function readValue(key, fallback) {
     try {
@@ -67,7 +67,9 @@
 
     const next = readVisibilityState();
     for (const moduleId of DEFAULT_ON_MODULES) {
-      next[moduleId] = true;
+      if (!Object.prototype.hasOwnProperty.call(next, moduleId) || force) {
+        next[moduleId] = true;
+      }
     }
 
     const saved = writeValue(VISIBILITY_STATE_KEY, next);
@@ -110,9 +112,10 @@
     return [];
   }
 
-  async function startMatching(reason = 'scheduled') {
+  async function startMatching(reason = 'direct') {
     const loader = window.NovaModuleLoader;
     if (!loader || typeof loader.setVisible !== 'function') {
+      console.warn('[Nova Core] Default module start skipped: loader unavailable', reason);
       return { started: 0, reason: 'loader-not-ready' };
     }
 
@@ -129,25 +132,26 @@
 
       try {
         const ok = await loader.setVisible(module, true, {
-          source: 'default-autostart:' + reason
+          source: 'default-site-module:' + reason
         });
 
-        if (ok) {
-          started += 1;
-          const api = module.api && window[module.api];
-          if (api && typeof api.show === 'function') api.show();
-          if (api && typeof api.refresh === 'function') api.refresh();
-        }
+        if (!ok) continue;
+        started += 1;
+
+        const api = module.api && window[module.api];
+        if (api && typeof api.show === 'function') api.show();
+        if (api && typeof api.refresh === 'function') api.refresh();
       } catch (error) {
-        console.warn('[Nova Core] Default module autostart failed', moduleId, error);
+        console.warn('[Nova Core] Default module start failed', moduleId, error);
       }
     }
 
+    console.log('[Nova Core] Default site modules started', { reason, started });
     return { started, reason };
   }
 
-  function scheduleAutostart(reason = 'boot') {
-    for (const delay of START_DELAYS) {
+  function scheduleRetries(reason) {
+    for (const delay of RETRY_DELAYS) {
       setTimeout(() => {
         startMatching(reason + ':' + delay).catch(() => {});
       }, delay);
@@ -160,6 +164,7 @@
       applied: readValue(MIGRATION_MARKER_KEY, false) === true,
       defaults: DEFAULT_ON_MODULES.slice(),
       visibilityState: readVisibilityState(),
+      loaderReady: Boolean(window.NovaModuleLoader),
       matching: getRegistry()
         .filter((item) => DEFAULT_ON_MODULES.includes(item?.id) && matches(item))
         .map((item) => item.id)
@@ -170,17 +175,19 @@
     version: VERSION,
     applyDefaults,
     startMatching,
-    scheduleAutostart,
+    scheduleRetries,
     getStatus
   };
 
   const result = applyDefaults();
   console.log('[Nova Core] Default module state', result);
 
-  scheduleAutostart('core-load');
-  window.addEventListener('load', () => scheduleAutostart('window-load'), { once: true });
-  window.addEventListener('pageshow', () => scheduleAutostart('pageshow'));
+  startMatching('core-after-loader').catch(() => {});
+  scheduleRetries('core-after-loader');
+  window.addEventListener('pageshow', () => {
+    startMatching('pageshow').catch(() => {});
+  });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) scheduleAutostart('visible');
+    if (!document.hidden) startMatching('visible').catch(() => {});
   });
 })();
