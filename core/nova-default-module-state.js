@@ -4,10 +4,59 @@
 
   if (window.NovaDefaultModuleState) return;
 
-  const VERSION = '2.0.0';
+  const VERSION = '2.1.0';
   const VISIBILITY_STATE_KEY = 'nova.modules.visibility.v1';
   const MIGRATION_MARKER_KEY = 'nova.modules.autoload-defaults.v1.applied';
   const RETRY_DELAYS = [0, 250, 1000, 3000, 8000];
+  const FETCH_BRIDGE_FLAG = '__novaAbsoluteUrlFetchBridge';
+
+  function installFetchBridge() {
+    const currentFetch = globalThis.fetch;
+    if (typeof currentFetch !== 'function') return false;
+    if (currentFetch[FETCH_BRIDGE_FLAG] === true) return true;
+
+    const nativeFetch = currentFetch.bind(globalThis);
+    const bridgedFetch = function novaAbsoluteUrlFetch(input, init) {
+      let resolvedInput = input;
+
+      if (typeof input === 'string') {
+        resolvedInput = new URL(input, location.href).href;
+      } else if (input instanceof URL) {
+        resolvedInput = input.href;
+      }
+
+      return nativeFetch(resolvedInput, init);
+    };
+
+    try {
+      Object.defineProperty(bridgedFetch, FETCH_BRIDGE_FLAG, {
+        value: true,
+        configurable: false,
+        enumerable: false,
+        writable: false
+      });
+    } catch (_) {
+      bridgedFetch[FETCH_BRIDGE_FLAG] = true;
+    }
+
+    try {
+      globalThis.fetch = bridgedFetch;
+    } catch (_) {
+      try {
+        Object.defineProperty(globalThis, 'fetch', {
+          value: bridgedFetch,
+          configurable: true,
+          writable: true
+        });
+      } catch (error) {
+        console.warn('[Nova Core] Could not install absolute URL fetch bridge', error);
+        return false;
+      }
+    }
+
+    console.log('[Nova Core] Absolute URL fetch bridge installed');
+    return true;
+  }
 
   function readValue(key, fallback) {
     try {
@@ -130,16 +179,39 @@
     }
   }
 
-  function showAndRefresh(module) {
+  function getModuleStatus(api) {
+    try {
+      if (api && typeof api.getStatus === 'function') {
+        const status = api.getStatus();
+        return status && typeof status === 'object' ? status : null;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function showModule(module) {
     const api = moduleApi(module);
     if (!api) return false;
 
+    const status = getModuleStatus(api);
+    if (status && (status.visible === true || status.active === true)) {
+      return true;
+    }
+
     try {
-      if (typeof api.show === 'function') api.show();
-      if (typeof api.refresh === 'function') api.refresh();
+      if (typeof api.show === 'function') {
+        api.show();
+        return true;
+      }
+
+      if (typeof api.refresh === 'function') {
+        api.refresh();
+        return true;
+      }
+
       return true;
     } catch (error) {
-      console.warn('[Nova Core] Autoload refresh failed', module.id, error);
+      console.warn('[Nova Core] Autoload show failed', module.id, error);
       return false;
     }
   }
@@ -178,7 +250,7 @@
       }
       if (preference === null) writePreference(module.id, true);
 
-      if (showAndRefresh(module)) {
+      if (showModule(module)) {
         visible += 1;
         continue;
       }
@@ -200,6 +272,7 @@
   function getStatus() {
     return {
       version: VERSION,
+      fetchBridge: globalThis.fetch?.[FETCH_BRIDGE_FLAG] === true,
       visibilityState: readVisibilityState(),
       matching: autoloadModules()
         .filter(matches)
@@ -217,9 +290,11 @@
     applyDefaults,
     ensureMatching,
     schedule,
+    installFetchBridge,
     getStatus
   };
 
+  installFetchBridge();
   console.log('[Nova Core] Autoload defaults', applyDefaults());
 
   document.addEventListener('nova-module-command-result', (event) => {
@@ -227,7 +302,7 @@
     if (!detail || detail.action !== 'launch' || !detail.ok) return;
 
     const module = autoloadModules().find((item) => item.id === detail.id);
-    if (module) showAndRefresh(module);
+    if (module) showModule(module);
   });
 
   ensureMatching('core-ready');
