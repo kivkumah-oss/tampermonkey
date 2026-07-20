@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2.6.31",
-  "updatedAt": "2026-07-20T20:10:00Z",
+  "version": "2.6.32",
+  "updatedAt": "2026-07-20T20:24:00Z",
   "bootstrapMinVersion": "2.2.5",
   "core": [
     {
@@ -241,8 +241,8 @@
     {
       "id": "nova-default-module-state",
       "name": "Nova Default Site Modules",
-      "description": "Starts HERO and POPS after the module loader is ready on every matching page, while preserving the user's OFF choice.",
-      "version": "1.2.0",
+      "description": "Autolaunches HERO and POPS through the same command path as the working Launch button, while preserving the user's OFF choice.",
+      "version": "1.3.0",
       "order": 160,
       "required": true,
       "enabled": true,
