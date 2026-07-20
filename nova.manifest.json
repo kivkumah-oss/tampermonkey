@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2.6.27",
-  "updatedAt": "2026-07-20T16:33:43Z",
+  "version": "2.6.28",
+  "updatedAt": "2026-07-20T18:45:00Z",
   "bootstrapMinVersion": "2.2.5",
   "core": [
     {
@@ -228,8 +228,8 @@
     {
       "id": "nova-module-loader",
       "name": "Nova Module Loader",
-      "description": "Downloads, caches, updates, launches Nova modules, bridges Firefox userscript sandbox events, and mirrors modules into Bootstrap cache for document-start capture.",
-      "version": "1.1.7",
+      "description": "Downloads, caches, updates, launches, and persistently restores Nova modules across refreshes and matching pages.",
+      "version": "1.2.0",
       "order": 150,
       "required": true,
       "enabled": true,
