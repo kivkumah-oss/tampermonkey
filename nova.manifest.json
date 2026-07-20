@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "2.6.29",
-  "updatedAt": "2026-07-20T19:37:49Z",
+  "version": "2.6.30",
+  "updatedAt": "2026-07-20T19:55:00Z",
   "bootstrapMinVersion": "2.2.5",
   "core": [
     {
@@ -228,8 +228,8 @@
     {
       "id": "nova-default-module-state",
       "name": "Nova Default Module State",
-      "description": "Enables HERO and POPS by default once, while preserving the user's later choice to turn either module off.",
-      "version": "1.0.0",
+      "description": "Actively starts HERO and POPS on matching pages by default, while preserving the user's choice to turn either module off.",
+      "version": "1.1.0",
       "order": 145,
       "required": true,
       "enabled": true,
@@ -336,6 +336,7 @@
       "type": "module",
       "enabled": true,
       "autoload": true,
+      "defaultOn": true,
       "core": false,
       "api": "NovaHeroIntelligence",
       "match": [
@@ -356,6 +357,7 @@
       "type": "module",
       "enabled": true,
       "autoload": true,
+      "defaultOn": true,
       "core": false,
       "api": "NovaPopsModernUI",
       "match": [
