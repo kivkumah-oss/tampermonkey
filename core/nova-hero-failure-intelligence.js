@@ -4,7 +4,7 @@
 
   if (window.NovaHeroFailureIntelligence) return;
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.1.1';
   const HERO_HOST = /^hero\.[^.]+\.picking\.aft\.a2z\.com$/i;
   const FAILURE_TYPES = new Set(['FAIL_SHIPMENT', 'ReportDefect']);
   const RETRY_DELAYS = [0, 350, 1200, 3500, 8000];
@@ -14,6 +14,7 @@
   let routeTimer = null;
   let panelObserver = null;
   let requestSequence = 0;
+  let retryTimers = [];
   let lastResult = null;
 
   function isHeroHost() {
@@ -279,16 +280,29 @@
     }
   }
 
+  function clearRetryTimers() {
+    for (const timer of retryTimers) clearTimeout(timer);
+    retryTimers = [];
+  }
+
   function schedule(reason = 'boot', force = false) {
     if (!isHeroHost()) return false;
-    if (force) readyHref = '';
+
+    if (force) {
+      readyHref = '';
+      clearRetryTimers();
+    } else if (retryTimers.length) {
+      return true;
+    }
 
     for (const delay of RETRY_DELAYS) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        retryTimers = retryTimers.filter((entry) => entry !== timer);
         if (!isHeroHost()) return;
         if (!force && readyHref === location.href) return;
         refresh(`${reason}:${delay}`);
       }, delay);
+      retryTimers.push(timer);
     }
 
     return true;
