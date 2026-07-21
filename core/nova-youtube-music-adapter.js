@@ -5,7 +5,7 @@
 
   if (window.NovaYouTubeMusicAdapter) return;
 
-  const VERSION = '1.2.1';
+  const VERSION = '1.2.2';
   const STATE_KEY = 'nova.ytm.state.v1';
   const COMMAND_KEY = 'nova.ytm.command.v1';
   const IS_YTM = location.hostname === 'music.youtube.com';
@@ -43,7 +43,7 @@
     const theme = window.NovaAudioTheme;
     if (!theme || typeof theme.start !== 'function') return;
     try {
-      theme.start(m, { syntheticFallback: true, tryReal: true });
+      theme.start(m, { syntheticFallback: true });
       themedMedia = m;
     } catch (error) {
       console.warn('[Nova Core] YouTube Music audio theme unavailable', error);
