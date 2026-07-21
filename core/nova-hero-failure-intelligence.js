@@ -4,7 +4,7 @@
 
   if (window.NovaHeroFailureIntelligence) return;
 
-  const VERSION = '0.2.0';
+  const VERSION = '0.3.0';
   const HERO_HOST = /^hero\.[^.]+\.picking\.aft\.a2z\.com$/i;
   const FAILURE_TYPES = new Set(['FAIL_SHIPMENT', 'ReportDefect']);
   const RETRY_DELAYS = [0, 350, 1200, 3500, 8000];
@@ -45,7 +45,7 @@
       .replace(/[}\]]+$/g, '')
       .trim();
 
-    return /^(null|undefined|none)$/i.test(cleaned) ? '' : cleaned;
+    return /^(null|undefined|none|n\/a)$/i.test(cleaned) ? '' : cleaned;
   }
 
   function extractValue(message, regex) {
@@ -53,46 +53,168 @@
     return cleanValue(match?.[1] || '');
   }
 
+  function extractAny(message, names) {
+    for (const name of names) {
+      const value = extractValue(
+        message,
+        new RegExp(`\\b${name}\\s*[=:]\\s*([^,}\\]\\n]+)`, 'i')
+      );
+      if (value) return value;
+    }
+    return '';
+  }
+
   function parseFailureMessage(message) {
     const text = String(message || '');
 
-    const itemReasons = [...text.matchAll(/\bfailureReason=([^,}\]]+)/gi)]
+    const itemReasons = [...text.matchAll(/\bfailureReason\s*[=:]\s*([^,}\]\n]+)/gi)]
       .map((match) => cleanValue(match[1]))
       .filter(Boolean);
 
-    const specificReason =
-      itemReasons[0] ||
-      extractValue(text, /\bdefectReason=([^,}\]]+)/i) ||
-      extractValue(text, /\bdamageReason=([^,}\]]+)/i) ||
-      extractValue(text, /\breasonCode=([^,}\]]+)/i);
+    const defectReasonCode = extractAny(text, [
+      'DefectReasonCode',
+      'defectReasonCode',
+      'ReasonCode',
+      'reasonCode'
+    ]);
+
+    const defectReasonText = extractAny(text, [
+      'DefectReasonText',
+      'defectReasonText',
+      'DefectReason',
+      'defectReason',
+      'DamageReason',
+      'damageReason'
+    ]);
+
+    const defectType = extractAny(text, [
+      'DefectType',
+      'defectType',
+      'ProblemType',
+      'problemType'
+    ]);
 
     const broadReason = extractValue(
       text,
-      /\bshipmentFailureReason=([^,}\]]+)/i
+      /\bshipmentFailureReason\s*[=:]\s*([^,}\]\n]+)/i
     );
 
     return {
-      reason: specificReason || broadReason,
-      psContainer: extractValue(
-        text,
-        /\bProblemSolveContainerScannableId=([^,}\]]+)/i
-      ),
-      previousCondition: extractValue(
-        text,
-        /\bPreviousExternalShipmentCondition=([^,}\]]+)/i
-      ),
-      source: extractValue(
-        text,
-        /\bShipmentGroupType=([^,}\]]+)/i
-      ),
-      client: extractValue(
-        text,
-        /\bClientApplicationName=([^,}\]]+)/i
-      ),
-      shipmentGroup: extractValue(
-        text,
-        /\bShipmentGroupId=([^,}\]]+)/i
-      )
+      itemReason: itemReasons[0] || '',
+      defectReasonCode,
+      defectReasonText,
+      defectType,
+      broadReason,
+      psContainer: extractAny(text, [
+        'ProblemSolveContainerScannableId',
+        'problemSolveContainerScannableId'
+      ]),
+      previousCondition: extractAny(text, [
+        'PreviousExternalShipmentCondition',
+        'previousExternalShipmentCondition'
+      ]),
+      source: extractAny(text, [
+        'ShipmentGroupType',
+        'shipmentGroupType'
+      ]),
+      client: extractAny(text, [
+        'ClientApplicationName',
+        'clientApplicationName'
+      ]),
+      shipmentGroup: extractAny(text, [
+        'ShipmentGroupId',
+        'shipmentGroupId'
+      ]),
+      raw: text
+    };
+  }
+
+  function normaliseEvidence(value) {
+    return String(value || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[\s./-]+/g, '_');
+  }
+
+  function humaniseRaw(value) {
+    const cleaned = cleanValue(value);
+    if (!cleaned) return '';
+    return cleaned
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (character) => character.toUpperCase());
+  }
+
+  function classifyDefect(parsed, event) {
+    const structured = [
+      { value: parsed.itemReason, priority: 5, source: 'itemFailureReason' },
+      { value: parsed.defectReasonCode, priority: 5, source: 'DefectReasonCode' },
+      { value: parsed.defectReasonText, priority: 4, source: 'DefectReasonText' },
+      { value: parsed.broadReason, priority: 3, source: 'shipmentFailureReason' },
+      { value: parsed.defectType, priority: 2, source: 'DefectType' }
+    ].filter((entry) => cleanValue(entry.value));
+
+    const allText = [
+      ...structured.map((entry) => entry.value),
+      event?.description,
+      event?.eventType
+    ].filter(Boolean).join(' | ');
+
+    const normalised = normaliseEvidence(allText);
+
+    const specificSource = structured[0]?.source || 'eventDescription';
+    const raw = structured[0]?.value || cleanValue(event?.description) || event?.eventType || '';
+    const priority = structured[0]?.priority || 0;
+
+    if (/TRANSPARENCY|SERIAL(_NUMBER)?|SERIALIZATION|SERIALISATION/.test(normalised)) {
+      return {
+        label: 'Transparency / serial number issue',
+        category: 'TRANSPARENCY_SERIAL',
+        raw,
+        source: specificSource,
+        specificity: Math.max(priority, 5)
+      };
+    }
+
+    if (/ITEM_MISSING|MISSING_ITEM|MISSING_FROM|NOT_PRESENT|ITEM_NOT_FOUND|UNIT_MISSING|SHORTAGE/.test(normalised)) {
+      return {
+        label: 'Item missing',
+        category: 'MISSING',
+        raw,
+        source: specificSource,
+        specificity: Math.max(priority, 4)
+      };
+    }
+
+    if (/ITEM_DAMAGED|DAMAGED_ITEM|DAMAGE|BROKEN|CRUSHED/.test(normalised)) {
+      return {
+        label: 'Damaged',
+        category: 'DAMAGED',
+        raw,
+        source: specificSource,
+        specificity: Math.max(priority, 3)
+      };
+    }
+
+    if (/UNSCANNABLE|BARCODE.*(FAIL|INVALID|UNREADABLE)|CANNOT_SCAN|WON_T_SCAN/.test(normalised)) {
+      return {
+        label: 'Unscannable',
+        category: 'UNSCANNABLE',
+        raw,
+        source: specificSource,
+        specificity: Math.max(priority, 3)
+      };
+    }
+
+    const generic = /ITEM_REPORTED_AS_DEFECTIVE|ITEM REPORTED AS DEFECTIVE|FAILED ATTEMPT AT PACKING SHIPMENT/.test(normalised);
+
+    return {
+      label: generic ? 'Defect reason not exposed' : (humaniseRaw(raw) || 'Defect reason not exposed'),
+      category: generic ? 'UNKNOWN' : 'OTHER',
+      raw,
+      source: specificSource,
+      specificity: generic ? 0 : priority
     };
   }
 
@@ -161,6 +283,7 @@
 
     const rows = [
       ['Event', 'psEvent'],
+      ['Defect Evidence', 'defectEvidence'],
       ['PS Tote', 'psContainer'],
       ['Previous Condition', 'previousCondition'],
       ['Source', 'failureSource'],
@@ -184,6 +307,7 @@
     try {
       for (const selector of [
         '.psEvent',
+        '.defectEvidence',
         '.psContainer',
         '.previousCondition',
         '.failureSource',
@@ -222,8 +346,9 @@
     try {
       setText('.psEvent', evidence.eventType);
       setText('.associate', evidence.actor);
-      setText('.reason', evidence.defect);
+      setText('.reason', evidence.defectLabel);
       setText('.time', evidence.defectTime);
+      setText('.defectEvidence', evidence.defectRaw);
       setPsContainer(evidence.fc, evidence.psContainer);
       setText('.previousCondition', evidence.previousCondition);
       setText('.failureSource', evidence.source);
@@ -242,8 +367,9 @@
     const expected = [
       ['.psEvent', evidence.eventType],
       ['.associate', evidence.actor],
-      ['.reason', evidence.defect],
+      ['.reason', evidence.defectLabel],
       ['.time', evidence.defectTime],
+      ['.defectEvidence', evidence.defectRaw],
       ['.psContainer', evidence.psContainer],
       ['.previousCondition', evidence.previousCondition],
       ['.failureSource', evidence.source],
@@ -295,6 +421,46 @@
     return response.json();
   }
 
+  async function buildCandidate(event, eventsPath, sequence, route) {
+    let parsed = parseFailureMessage('');
+
+    if (event.requestId && event.eventDetailsKey) {
+      const detailsPath = `${eventsPath}/id/${encodeURIComponent(event.requestId)}/details/key/${encodeURIComponent(event.eventDetailsKey)}`;
+      const details = await fetchJson(detailsPath);
+      if (sequence !== requestSequence || location.href !== lastHref) return null;
+      parsed = parseFailureMessage(details?.eventDetails?.message || '');
+    }
+
+    const classification = classifyDefect(parsed, event);
+    const moduleName = cleanValue(event?.metaData?.module);
+    const team = cleanValue(event?.metaData?.team);
+    const actor = cleanValue(event?.metaData?.userId);
+    const moduleParts = [...new Set([
+      moduleName,
+      team,
+      parsed.client
+    ].filter(Boolean))];
+
+    return {
+      href: location.href,
+      fc: route.fc,
+      shipment: route.shipment,
+      eventType: event.eventType || '',
+      actor,
+      defectLabel: classification.label,
+      defectCategory: classification.category,
+      defectRaw: classification.raw,
+      defectSource: classification.source,
+      specificity: classification.specificity,
+      defectTime: formatTime(event.timeStamp),
+      psContainer: parsed.psContainer,
+      previousCondition: parsed.previousCondition,
+      source: parsed.source || parsed.shipmentGroup,
+      moduleText: moduleParts.join(' / '),
+      timestamp: Number(event.timeStamp || 0)
+    };
+  }
+
   async function refresh(reason = 'manual') {
     if (!isHeroHost()) return false;
 
@@ -309,12 +475,11 @@
       const data = await fetchJson(eventsPath);
       if (sequence !== requestSequence || location.href !== lastHref) return false;
 
-      const events = Array.isArray(data?.EventList) ? data.EventList : [];
-      const failure = events
+      const events = (Array.isArray(data?.EventList) ? data.EventList : [])
         .filter((event) => FAILURE_TYPES.has(event?.eventType))
-        .sort((a, b) => Number(b?.timeStamp || 0) - Number(a?.timeStamp || 0))[0];
+        .sort((a, b) => Number(b?.timeStamp || 0) - Number(a?.timeStamp || 0));
 
-      if (!failure) {
+      if (!events.length) {
         lastEvidence = null;
         clearExtensionFields();
         readyHref = location.href;
@@ -327,50 +492,22 @@
         return true;
       }
 
-      const actor = cleanValue(failure?.metaData?.userId);
-      const moduleName = cleanValue(failure?.metaData?.module);
-      const team = cleanValue(failure?.metaData?.team);
+      let selected = null;
+      let fallback = null;
 
-      let parsed = {
-        reason: '',
-        psContainer: '',
-        previousCondition: '',
-        source: '',
-        client: '',
-        shipmentGroup: ''
-      };
+      for (const event of events.slice(0, 8)) {
+        const candidate = await buildCandidate(event, eventsPath, sequence, route);
+        if (!candidate) return false;
+        if (!fallback) fallback = candidate;
 
-      if (failure.requestId && failure.eventDetailsKey) {
-        const detailsPath = `${eventsPath}/id/${encodeURIComponent(failure.requestId)}/details/key/${encodeURIComponent(failure.eventDetailsKey)}`;
-        const details = await fetchJson(detailsPath);
-        if (sequence !== requestSequence || location.href !== lastHref) return false;
-        parsed = parseFailureMessage(details?.eventDetails?.message || '');
+        if (candidate.specificity >= 2 && candidate.defectCategory !== 'UNKNOWN') {
+          selected = candidate;
+          break;
+        }
       }
 
-      const defect =
-        parsed.reason ||
-        cleanValue(failure.description) ||
-        failure.eventType;
-
-      const moduleParts = [...new Set([
-        moduleName,
-        team,
-        parsed.client
-      ].filter(Boolean))];
-
-      const evidence = {
-        href: location.href,
-        fc: route.fc,
-        shipment: route.shipment,
-        eventType: failure.eventType || '',
-        actor,
-        defect,
-        defectTime: formatTime(failure.timeStamp),
-        psContainer: parsed.psContainer,
-        previousCondition: parsed.previousCondition,
-        source: parsed.source || parsed.shipmentGroup,
-        moduleText: moduleParts.join(' / ')
-      };
+      const evidence = selected || fallback;
+      if (!evidence) return false;
 
       lastEvidence = evidence;
       applyEvidence(evidence, reason);
@@ -380,7 +517,10 @@
         shipment: route.shipment,
         found: true,
         eventType: evidence.eventType,
-        defect: evidence.defect,
+        defectLabel: evidence.defectLabel,
+        defectCategory: evidence.defectCategory,
+        defectRaw: evidence.defectRaw || null,
+        defectSource: evidence.defectSource,
         psContainer: evidence.psContainer || null,
         previousCondition: evidence.previousCondition || null,
         source: evidence.source || null,
@@ -474,9 +614,7 @@
     }
 
     document.addEventListener('click', (event) => {
-      if (!event.target?.closest?.('#hero-tooltips-top-panel .heroTopRefresh')) {
-        return;
-      }
+      if (!event.target?.closest?.('#hero-tooltips-top-panel .heroTopRefresh')) return;
       schedule('hero-refresh', true);
     }, true);
 
@@ -511,6 +649,7 @@
     schedule,
     applyEvidence,
     parseFailureMessage,
+    classifyDefect,
     getStatus
   };
 
