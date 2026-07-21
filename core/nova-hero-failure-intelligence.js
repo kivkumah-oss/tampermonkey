@@ -4,7 +4,7 @@
 
   if (window.NovaHeroFailureIntelligence) return;
 
-  const VERSION = '0.1.1';
+  const VERSION = '0.2.0';
   const HERO_HOST = /^hero\.[^.]+\.picking\.aft\.a2z\.com$/i;
   const FAILURE_TYPES = new Set(['FAIL_SHIPMENT', 'ReportDefect']);
   const RETRY_DELAYS = [0, 350, 1200, 3500, 8000];
@@ -13,8 +13,13 @@
   let lastHref = location.href;
   let routeTimer = null;
   let panelObserver = null;
+  let fieldObserver = null;
+  let observedDetails = null;
   let requestSequence = 0;
   let retryTimers = [];
+  let reapplyTimer = null;
+  let applyingEvidence = false;
+  let lastEvidence = null;
   let lastResult = null;
 
   function isHeroHost() {
@@ -50,9 +55,16 @@
 
   function parseFailureMessage(message) {
     const text = String(message || '');
+
     const itemReasons = [...text.matchAll(/\bfailureReason=([^,}\]]+)/gi)]
       .map((match) => cleanValue(match[1]))
       .filter(Boolean);
+
+    const specificReason =
+      itemReasons[0] ||
+      extractValue(text, /\bdefectReason=([^,}\]]+)/i) ||
+      extractValue(text, /\bdamageReason=([^,}\]]+)/i) ||
+      extractValue(text, /\breasonCode=([^,}\]]+)/i);
 
     const broadReason = extractValue(
       text,
@@ -60,7 +72,7 @@
     );
 
     return {
-      reason: itemReasons[0] || broadReason,
+      reason: specificReason || broadReason,
       psContainer: extractValue(
         text,
         /\bProblemSolveContainerScannableId=([^,}\]]+)/i
@@ -88,25 +100,42 @@
     return document.getElementById('hero-tooltips-top-panel');
   }
 
+  function valueNode(selector) {
+    return panel()?.querySelector(selector) || null;
+  }
+
+  function readText(selector) {
+    return String(valueNode(selector)?.textContent || '').trim();
+  }
+
   function setText(selector, value) {
-    const node = panel()?.querySelector(selector);
+    const node = valueNode(selector);
     if (!node) return false;
-    node.textContent = String(value || '');
+
+    const next = String(value || '');
+    if (node.textContent !== next) node.textContent = next;
     return true;
   }
 
   function setPsContainer(fc, value) {
-    const node = panel()?.querySelector('.psContainer');
+    const node = valueNode('.psContainer');
     if (!node) return false;
 
-    node.textContent = '';
-    if (!value) return true;
+    const next = String(value || '');
+    if (!next) {
+      if (node.textContent) node.textContent = '';
+      return true;
+    }
 
+    const currentLink = node.querySelector('a');
+    if (currentLink && currentLink.textContent === next) return true;
+
+    node.textContent = '';
     const link = document.createElement('a');
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.href = `https://fcresearch-eu.aka.amazon.com/${encodeURIComponent(fc)}/results?s=${encodeURIComponent(value)}`;
-    link.textContent = value;
+    link.href = `https://fcresearch-eu.aka.amazon.com/${encodeURIComponent(fc)}/results?s=${encodeURIComponent(next)}`;
+    link.textContent = next;
     node.appendChild(link);
     return true;
   }
@@ -119,10 +148,10 @@
     labelNode.className = 'novaDataLabel';
     labelNode.textContent = label;
 
-    const valueNode = document.createElement('div');
-    valueNode.className = `novaDataValue ${className}`;
+    const value = document.createElement('div');
+    value.className = `novaDataValue ${className}`;
 
-    row.append(labelNode, valueNode);
+    row.append(labelNode, value);
     return row;
   }
 
@@ -146,18 +175,24 @@
       details.insertBefore(createRow(label, className), cancelRow);
     }
 
+    attachFieldObserver();
     return true;
   }
 
   function clearExtensionFields() {
-    for (const selector of [
-      '.psEvent',
-      '.psContainer',
-      '.previousCondition',
-      '.failureSource',
-      '.failureModule'
-    ]) {
-      setText(selector, '');
+    applyingEvidence = true;
+    try {
+      for (const selector of [
+        '.psEvent',
+        '.psContainer',
+        '.previousCondition',
+        '.failureSource',
+        '.failureModule'
+      ]) {
+        setText(selector, '');
+      }
+    } finally {
+      applyingEvidence = false;
     }
   }
 
@@ -166,6 +201,87 @@
     return new Date(Number(timestamp) * 1000).toLocaleString('en-GB', {
       timeZone: 'Europe/London'
     });
+  }
+
+  function evidenceMatchesCurrentRoute(evidence) {
+    const route = parseRoute();
+    return Boolean(
+      evidence &&
+      route &&
+      evidence.href === location.href &&
+      evidence.fc === route.fc &&
+      evidence.shipment === route.shipment
+    );
+  }
+
+  function applyEvidence(evidence, reason = 'apply') {
+    if (!evidenceMatchesCurrentRoute(evidence)) return false;
+    if (!ensureRows()) return false;
+
+    applyingEvidence = true;
+    try {
+      setText('.psEvent', evidence.eventType);
+      setText('.associate', evidence.actor);
+      setText('.reason', evidence.defect);
+      setText('.time', evidence.defectTime);
+      setPsContainer(evidence.fc, evidence.psContainer);
+      setText('.previousCondition', evidence.previousCondition);
+      setText('.failureSource', evidence.source);
+      setText('.failureModule', evidence.moduleText);
+    } finally {
+      applyingEvidence = false;
+    }
+
+    console.debug('[Nova HERO] Failure evidence applied', reason);
+    return true;
+  }
+
+  function evidenceIsVisible(evidence) {
+    if (!evidenceMatchesCurrentRoute(evidence)) return false;
+
+    const expected = [
+      ['.psEvent', evidence.eventType],
+      ['.associate', evidence.actor],
+      ['.reason', evidence.defect],
+      ['.time', evidence.defectTime],
+      ['.psContainer', evidence.psContainer],
+      ['.previousCondition', evidence.previousCondition],
+      ['.failureSource', evidence.source],
+      ['.failureModule', evidence.moduleText]
+    ];
+
+    return expected.every(([selector, value]) => {
+      const next = String(value || '').trim();
+      if (!next) return true;
+      return readText(selector) === next;
+    });
+  }
+
+  function queueEvidenceRepair(reason = 'mutation') {
+    if (applyingEvidence || !lastEvidence) return;
+    clearTimeout(reapplyTimer);
+
+    reapplyTimer = setTimeout(() => {
+      reapplyTimer = null;
+      if (!lastEvidence || !evidenceMatchesCurrentRoute(lastEvidence)) return;
+      if (!evidenceIsVisible(lastEvidence)) applyEvidence(lastEvidence, reason);
+    }, 45);
+  }
+
+  function attachFieldObserver() {
+    const details = panel()?.querySelector('.novaPsDetails') || null;
+    if (!details) return false;
+    if (fieldObserver && observedDetails === details) return true;
+
+    fieldObserver?.disconnect();
+    observedDetails = details;
+    fieldObserver = new MutationObserver(() => queueEvidenceRepair('field-overwrite'));
+    fieldObserver.observe(details, {
+      subtree: true,
+      childList: true,
+      characterData: true
+    });
+    return true;
   }
 
   async function fetchJson(path) {
@@ -191,16 +307,16 @@
     try {
       const eventsPath = `/api/fcs/${encodeURIComponent(route.fc)}/entities/type/CUSTOMER_SHIPMENT/id/${encodeURIComponent(route.shipment)}/events`;
       const data = await fetchJson(eventsPath);
-      if (sequence !== requestSequence) return false;
+      if (sequence !== requestSequence || location.href !== lastHref) return false;
 
       const events = Array.isArray(data?.EventList) ? data.EventList : [];
       const failure = events
         .filter((event) => FAILURE_TYPES.has(event?.eventType))
         .sort((a, b) => Number(b?.timeStamp || 0) - Number(a?.timeStamp || 0))[0];
 
-      clearExtensionFields();
-
       if (!failure) {
+        lastEvidence = null;
+        clearExtensionFields();
         readyHref = location.href;
         lastResult = {
           shipment: route.shipment,
@@ -215,10 +331,6 @@
       const moduleName = cleanValue(failure?.metaData?.module);
       const team = cleanValue(failure?.metaData?.team);
 
-      setText('.psEvent', failure.eventType || '');
-      setText('.time', formatTime(failure.timeStamp));
-      if (actor) setText('.associate', actor);
-
       let parsed = {
         reason: '',
         psContainer: '',
@@ -231,7 +343,7 @@
       if (failure.requestId && failure.eventDetailsKey) {
         const detailsPath = `${eventsPath}/id/${encodeURIComponent(failure.requestId)}/details/key/${encodeURIComponent(failure.eventDetailsKey)}`;
         const details = await fetchJson(detailsPath);
-        if (sequence !== requestSequence) return false;
+        if (sequence !== requestSequence || location.href !== lastHref) return false;
         parsed = parseFailureMessage(details?.eventDetails?.message || '');
       }
 
@@ -246,21 +358,33 @@
         parsed.client
       ].filter(Boolean))];
 
-      setText('.reason', defect);
-      setPsContainer(route.fc, parsed.psContainer);
-      setText('.previousCondition', parsed.previousCondition);
-      setText('.failureSource', parsed.source || parsed.shipmentGroup);
-      setText('.failureModule', moduleParts.join(' / '));
+      const evidence = {
+        href: location.href,
+        fc: route.fc,
+        shipment: route.shipment,
+        eventType: failure.eventType || '',
+        actor,
+        defect,
+        defectTime: formatTime(failure.timeStamp),
+        psContainer: parsed.psContainer,
+        previousCondition: parsed.previousCondition,
+        source: parsed.source || parsed.shipmentGroup,
+        moduleText: moduleParts.join(' / ')
+      };
 
+      lastEvidence = evidence;
+      applyEvidence(evidence, reason);
       readyHref = location.href;
+
       lastResult = {
         shipment: route.shipment,
         found: true,
-        eventType: failure.eventType,
-        defect,
-        psContainer: parsed.psContainer || null,
-        previousCondition: parsed.previousCondition || null,
-        source: parsed.source || parsed.shipmentGroup || null,
+        eventType: evidence.eventType,
+        defect: evidence.defect,
+        psContainer: evidence.psContainer || null,
+        previousCondition: evidence.previousCondition || null,
+        source: evidence.source || null,
+        moduleText: evidence.moduleText || null,
         reason,
         readAt: new Date().toISOString()
       };
@@ -299,7 +423,10 @@
       const timer = setTimeout(() => {
         retryTimers = retryTimers.filter((entry) => entry !== timer);
         if (!isHeroHost()) return;
-        if (!force && readyHref === location.href) return;
+        if (!force && readyHref === location.href) {
+          queueEvidenceRepair('scheduled-check');
+          return;
+        }
         refresh(`${reason}:${delay}`);
       }, delay);
       retryTimers.push(timer);
@@ -308,13 +435,27 @@
     return true;
   }
 
+  function resetForRouteChange() {
+    requestSequence += 1;
+    readyHref = '';
+    lastEvidence = null;
+    clearTimeout(reapplyTimer);
+    reapplyTimer = null;
+    clearRetryTimers();
+    clearExtensionFields();
+  }
+
   function install() {
     if (!isHeroHost()) return false;
 
     if (!panelObserver && document.documentElement) {
       panelObserver = new MutationObserver(() => {
-        if (readyHref === location.href) return;
-        if (panel()) schedule('panel-ready');
+        if (panel()) {
+          ensureRows();
+          attachFieldObserver();
+          if (lastEvidence) queueEvidenceRepair('panel-mutation');
+          if (readyHref !== location.href) schedule('panel-ready');
+        }
       });
 
       panelObserver.observe(document.documentElement, {
@@ -327,7 +468,7 @@
       routeTimer = setInterval(() => {
         if (location.href === lastHref) return;
         lastHref = location.href;
-        readyHref = '';
+        resetForRouteChange();
         schedule('route-change', true);
       }, 500);
     }
@@ -356,7 +497,9 @@
       version: VERSION,
       active: isHeroHost(),
       installed: Boolean(panelObserver || routeTimer),
+      fieldGuard: Boolean(fieldObserver),
       readyHref: readyHref || null,
+      lastEvidence,
       lastResult
     };
   }
@@ -366,6 +509,7 @@
     install,
     refresh,
     schedule,
+    applyEvidence,
     parseFailureMessage,
     getStatus
   };
