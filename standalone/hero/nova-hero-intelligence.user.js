@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova HERO Intelligence Console
 // @namespace    https://github.com/kivkumah-oss/tampermonkey
-// @version      1.4.1
+// @version      1.4.2
 // @author       Martins / Nova
 // @description  Standalone Nova HERO Intelligence Console with Dark, Glass and fully custom Theme Studio.
 // @match        https://hero.eu.picking.aft.a2z.com/*
@@ -68,7 +68,11 @@
       for (const part of PARTS) chunks.push(await fetchText(BASE + part));
 
       const source = await decodePayload(chunks.join(''));
-      Function(`${source}\n//# sourceURL=nova-hero-intelligence.payload.js`)();
+
+      // Keep the payload inside the userscript sandbox so @require globals
+      // such as jQuery, $, and waitForKeyElements remain available.
+      eval(`${source}\n//# sourceURL=nova-hero-intelligence.payload.js`);
+
       console.log('[Nova HERO] Standalone payload loaded', PARTS.length, 'compressed parts');
     } catch (error) {
       window.__NOVA_HERO_STANDALONE_LOADER__ = false;
