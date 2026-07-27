@@ -1,0 +1,153 @@
+ocalStorage.setItem(NOVA_HERO_THEME_KEY, JSON.stringify(theme));
+    } catch (_) {}
+  }
+
+  function hexToRgb(hex) {
+    const clean = String(hex || '').replace('#', '').trim();
+    if (!/^[0-9a-f]{6}$/i.test(clean)) return { r: 0, g: 0, b: 0 };
+    return {
+      r: parseInt(clean.slice(0, 2), 16),
+      g: parseInt(clean.slice(2, 4), 16),
+      b: parseInt(clean.slice(4, 6), 16)
+    };
+  }
+
+  function rgba(hex, alpha) {
+    const { r, g, b } = hexToRgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha))})`;
+  }
+
+  function applyHeroTheme(panel, theme = loadHeroTheme()) {
+    if (!panel) return;
+    const isGlass = panel.classList.contains('is-light');
+    const surfaceOpacity = isGlass ? Number(theme.glassOpacity) / 100 : Number(theme.opacity) / 100;
+    const accentAlpha = Math.max(.12, Number(theme.glow) / 100);
+
+    panel.style.setProperty('--nova-green', theme.accent);
+    panel.style.setProperty('--nova-green-dark', theme.accent2);
+    panel.style.setProperty('--nova-blue', theme.accent2);
+    panel.style.setProperty('--nova-purple', theme.accent3);
+    panel.style.setProperty('--nova-text', theme.text);
+    panel.style.setProperty('--nova-muted', theme.muted);
+    panel.style.setProperty('--nova-bg-0', rgba(theme.bg, isGlass ? .52 : .98));
+    panel.style.setProperty('--nova-bg-1', rgba(theme.bg, isGlass ? .44 : .94));
+    panel.style.setProperty('--nova-bg-2', rgba(theme.panel, isGlass ? .40 : .96));
+    panel.style.setProperty('--nova-card', rgba(theme.panel, surfaceOpacity));
+    panel.style.setProperty('--nova-card-deep', rgba(theme.bg, Math.min(1, surfaceOpacity + .03)));
+    panel.style.setProperty('--nova-line', rgba(theme.accent, .18 + accentAlpha * .18));
+    panel.style.setProperty('--nova-line-hot', rgba(theme.accent, .38 + accentAlpha * .38));
+    panel.style.setProperty('--nova-theme-bg', theme.bg);
+    panel.style.setProperty('--nova-theme-panel', theme.panel);
+    panel.style.setProperty('--nova-theme-opacity', surfaceOpacity);
+    panel.style.setProperty('--nova-theme-blur', `${Number(theme.blur)}px`);
+    panel.style.setProperty('--nova-theme-glow', `${Math.round(Number(theme.glow) * .32)}px`);
+    panel.dataset.novaHeroPreset = theme.preset || 'custom';
+
+    const studio = panel.querySelector('.novaThemeStudio');
+    if (studio) syncThemeStudio(studio, theme);
+  }
+
+  function syncThemeStudio(studio, theme) {
+    studio.querySelectorAll('[data-theme-field]').forEach(input => {
+      const field = input.dataset.themeField;
+      if (theme[field] !== undefined) input.value = theme[field];
+    });
+
+    const presetSelect = studio.querySelector('.novaThemePreset');
+    if (presetSelect) presetSelect.value = NOVA_HERO_PRESETS[theme.preset] ? theme.preset : 'custom';
+
+    studio.querySelectorAll('output[data-output-for]').forEach(output => {
+      const field = output.dataset.outputFor;
+      const suffix = field === 'blur' ? 'px' : '%';
+      output.textContent = `${theme[field]}${suffix}`;
+    });
+  }
+
+  function setThemeStudioOpen(panel, open) {
+    const studio = panel?.querySelector('.novaThemeStudio');
+    if (!studio) return;
+    studio.hidden = !open;
+    panel.classList.toggle('theme-studio-open', open);
+  }
+
+  function applyPreset(panel, presetId) {
+    const preset = NOVA_HERO_PRESETS[presetId];
+    if (!preset) return;
+    const current = loadHeroTheme();
+    const next = { ...current, ...preset, preset: presetId };
+    saveHeroTheme(next);
+    applyHeroTheme(panel, next);
+  }
+
+  function updateCustomTheme(panel, field, value) {
+    const next = loadHeroTheme();
+    next[field] = ['opacity', 'glassOpacity', 'blur', 'glow'].includes(field) ? Number(value) : value;
+    next.preset = 'custom';
+    saveHeroTheme(next);
+    applyHeroTheme(panel, next);
+  }
+
+  function resetHeroTheme(panel) {
+    const fresh = defaultThemeSettings();
+    saveHeroTheme(fresh);
+    applyHeroTheme(panel, fresh);
+  }
+
+  async function copyText(value) {
+    const text = String(value || '').trim();
+    if (!text) return false;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (error) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      return copied;
+    }
+  }
+
+  function setFailureReason(reason) {
+    const fullReason = String(reason || '').trim();
+    const preview = fullReason
+      ? (fullReason.length > 170 ? `${fullReason.slice(0, 170)}…` : fullReason)
+      : 'No failure message captured.';
+
+    $('.KickoutReason').text(fullReason);
+    $('.KickoutReasonPreview').text(preview).toggleClass('is-empty', !fullReason);
+    $('.novaReasonToggle, .novaReasonCopy').prop('disabled', !fullReason);
+  }
+
+  function looksLikeSystemActor(actor) {
+    return /^(autodwell|system|service|unknown)$/i.test(String(actor || '').trim()) ||
+      /service|system|lambda|pipeline|automation|scheduler|workflow|core/i.test(String(actor || ''));
+  }
+
+  function setDwellActor(kind, actor) {
+    const selector = kind === 'auto' ? '.autoDwellBy' : '.manualDwellBy';
+    const badgeSelector = kind === 'auto' ? '.autoDwellActorType' : '.manualDwellActorType';
+    const cleaned = String(actor || '').trim();
+    const system = looksLikeSystemActor(cleaned);
+
+    $(selector)
+      .text(cleaned || 'Not exposed')
+      .toggleClass('is-system', system)
+      .toggleClass('is-unknown', !cleaned);
+
+    $(badgeSelector)
+      .text(cleaned ? (system ? 'SYSTEM / SERVICE' : 'ASSOCIATE / USER') : 'UNKNOWN')
+      .attr('data-type', cleaned ? (system ? 'system' : 'user') : 'unknown');
+  }
+
+  function findActorInObject(value, depth = 0, visited = new WeakSet()) {
+    if (!value || typeof value !== 'object' || depth > 8 || visited.has(value)) return '';
+    visited.add(value);
+
+    const actorKeys = [
+  
