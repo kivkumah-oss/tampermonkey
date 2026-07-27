@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova HERO Intelligence Console
 // @namespace    https://github.com/kivkumah-oss/tampermonkey
-// @version      1.4.2
+// @version      1.4.3
 // @author       Martins / Nova
 // @description  Standalone Nova HERO Intelligence Console with Dark, Glass and fully custom Theme Studio.
 // @match        https://hero.eu.picking.aft.a2z.com/*
@@ -46,6 +46,41 @@
     });
   }
 
+  function showLoaderError(error) {
+    const old = document.getElementById('nova-hero-loader-error');
+    if (old) old.remove();
+
+    const box = document.createElement('div');
+    box.id = 'nova-hero-loader-error';
+    box.style.cssText = [
+      'position:fixed',
+      'right:18px',
+      'bottom:18px',
+      'z-index:2147483647',
+      'max-width:420px',
+      'padding:14px 16px',
+      'border:1px solid rgba(255,80,100,.7)',
+      'border-radius:12px',
+      'background:rgba(20,8,12,.94)',
+      'color:#fff',
+      'box-shadow:0 12px 36px rgba(0,0,0,.45)',
+      'font:13px/1.45 Arial,sans-serif'
+    ].join(';');
+
+    box.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="flex:1">
+          <strong style="display:block;color:#ff7185;margin-bottom:4px">Nova HERO failed to load</strong>
+          <span style="color:#ffd9df">${String(error?.message || error || 'Unknown error').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[ch]))}</span>
+        </div>
+        <button type="button" style="border:0;background:transparent;color:#fff;font-size:20px;cursor:pointer;line-height:1">×</button>
+      </div>`;
+
+    box.querySelector('button').addEventListener('click', () => box.remove());
+    document.documentElement.appendChild(box);
+    setTimeout(() => box.remove(), 12000);
+  }
+
   async function decodePayload(base64) {
     if (typeof DecompressionStream !== 'function') {
       throw new Error('This browser does not support gzip payload decoding.');
@@ -68,16 +103,13 @@
       for (const part of PARTS) chunks.push(await fetchText(BASE + part));
 
       const source = await decodePayload(chunks.join(''));
-
-      // Keep the payload inside the userscript sandbox so @require globals
-      // such as jQuery, $, and waitForKeyElements remain available.
       eval(`${source}\n//# sourceURL=nova-hero-intelligence.payload.js`);
 
       console.log('[Nova HERO] Standalone payload loaded', PARTS.length, 'compressed parts');
     } catch (error) {
       window.__NOVA_HERO_STANDALONE_LOADER__ = false;
       console.error('[Nova HERO] Failed to load standalone payload', error);
-      alert(`Nova HERO failed to load from GitHub.\n\n${error.message}`);
+      showLoaderError(error);
     }
   }
 
