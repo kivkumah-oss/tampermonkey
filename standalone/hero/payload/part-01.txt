@@ -1,0 +1,208 @@
+// ==UserScript==
+// @name         Nova HERO Intelligence Console
+// @namespace    https://github.com/kivkumah-oss/tampermonkey
+// @version      1.4.0
+// @author       lorfeuvr | shocklp | ofianajo | haljackg | bartohal
+// @description  Full Nova redesign for HERO with dark/glass modes and a persistent Nova Theme Studio with presets and full colour controls.
+// @match        https://hero.eu.picking.aft.a2z.com/*
+// @require      https://drive.corp.amazon.com/view/LCY3repart/lib/jquery.min.js
+// @require      https://drive.corp.amazon.com/view/LCY3repart/lib/waitForKeyElements.js
+// @icon         https://hero.eu.picking.aft.a2z.com/favicon.ico
+// @updateURL    https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/standalone/hero/nova-hero-intelligence.user.js
+// @downloadURL  https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/standalone/hero/nova-hero-intelligence.user.js
+// @grant        GM_xmlhttpRequest
+// @grant        GM_addStyle
+// @connect      rodeo-dub.amazon.com
+// ==/UserScript==
+
+/* globals jQuery, $, waitForKeyElements */
+
+(function () {
+  'use strict';
+
+  if (typeof window.jQuery !== 'function' && typeof jQuery === 'function') window.jQuery = jQuery;
+  if (typeof window.$ !== 'function' && typeof jQuery === 'function') window.$ = jQuery;
+
+  var _region, _fcname, _CustomerShipment;
+  var bridgingReason = "No bridging reason detected";
+
+  // -----------------------------
+  // Helpers (unchanged)
+  // -----------------------------
+  function parseHeroUrl(url) {
+    let m = url.match(/https:\/\/hero\.([^.]+)\.picking\.aft\.a2z\.com\/fc\/([^/]+)\/pick-events\/customer-shipment\/([^/?#]+)/i);
+    if (m) return { region: m[1], fc: m[2], shipment: m[3] };
+
+    m = url.match(/https:\/\/hero\.([^.]+)\.picking\.aft\.a2z\.com\/fc\/([^/]+)\/.*customer-shipment\/([^/?#]+)/i);
+    if (m) return { region: m[1], fc: m[2], shipment: m[3] };
+
+    return null;
+  }
+
+  function formatTime(ts) {
+    if (!ts) return '';
+    return new Date(ts * 1000).toLocaleString('en-GB', { timeZone: 'Europe/London' });
+  }
+
+  function setBridgingReason(msg) {
+    if (!msg) return;
+
+    const lowerMsg = String(msg).toLowerCase();
+    bridgingReason = "No bridging reason detected";
+
+    if (lowerMsg.includes('age verification') ||
+        lowerMsg.includes('items that require age verification') ||
+        lowerMsg.includes('age restriction constraint') ||
+        lowerMsg.includes('age restricted unit')) {
+      bridgingReason = "RC: Could not process due to age restricted unit.";
+    } else if (lowerMsg.includes('hazmat')) {
+      bridgingReason = "RC: Unable to process due to Hazmat issue.";
+    } else if (lowerMsg.includes('unable to assign ship method') || lowerMsg.includes('route_not_found')) {
+      bridgingReason = "RC: ATROPS, Unable to assign ship method.";
+    }
+
+    const $reason = $('.BridgingReason').text(bridgingReason);
+    $reason.toggleClass('is-alert', bridgingReason !== "No bridging reason detected");
+    updateStatusRail();
+  }
+
+  const NOVA_UI_STATE_KEY = 'novaHeroIntelligenceUiV1';
+  let statusObserver;
+
+  function loadUiState() {
+    try {
+      return JSON.parse(localStorage.getItem(NOVA_UI_STATE_KEY) || '{}');
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function saveUiState(state) {
+    try {
+      localStorage.setItem(NOVA_UI_STATE_KEY, JSON.stringify(state));
+    } catch (error) {}
+  }
+
+  const NOVA_HERO_THEME_KEY = 'novaHeroIntelligenceThemeV1';
+
+  const NOVA_HERO_PRESETS = {
+    venom: {
+      name: 'Venom Green',
+      accent: '#39ff14',
+      accent2: '#00e5ff',
+      accent3: '#a7ff24',
+      bg: '#030a08',
+      panel: '#07120e',
+      text: '#f4fff4',
+      muted: '#9be7a0'
+    },
+    violet: {
+      name: 'Violet Cyber',
+      accent: '#7c4dff',
+      accent2: '#00e5ff',
+      accent3: '#f472b6',
+      bg: '#0a0a12',
+      panel: '#141423',
+      text: '#ffffff',
+      muted: '#9ca3af'
+    },
+    fire: {
+      name: 'Fire Core',
+      accent: '#ff3d00',
+      accent2: '#ffea00',
+      accent3: '#ff8a20',
+      bg: '#100906',
+      panel: '#1c0e09',
+      text: '#fff7ed',
+      muted: '#fed7aa'
+    },
+    ice: {
+      name: 'Ice Terminal',
+      accent: '#38bdf8',
+      accent2: '#e0f2fe',
+      accent3: '#67e8f9',
+      bg: '#050c14',
+      panel: '#091623',
+      text: '#f8fbff',
+      muted: '#bae6fd'
+    },
+    matrix: {
+      name: 'Matrix',
+      accent: '#00ff66',
+      accent2: '#00aa44',
+      accent3: '#64ffda',
+      bg: '#000602',
+      panel: '#000e05',
+      text: '#eaffef',
+      muted: '#8fffb5'
+    },
+    rose: {
+      name: 'Rose Gold',
+      accent: '#fb7185',
+      accent2: '#fbbf24',
+      accent3: '#ff2bd6',
+      bg: '#140a0f',
+      panel: '#201018',
+      text: '#fff7f8',
+      muted: '#fecdd3'
+    },
+    warehouse: {
+      name: 'Warehouse Amber',
+      accent: '#f59e0b',
+      accent2: '#22d3ee',
+      accent3: '#facc15',
+      bg: '#0c0c0a',
+      panel: '#18150f',
+      text: '#fffbea',
+      muted: '#fde68a'
+    },
+    stealth: {
+      name: 'Stealth',
+      accent: '#64748b',
+      accent2: '#94a3b8',
+      accent3: '#cbd5e1',
+      bg: '#0b0f15',
+      panel: '#151b24',
+      text: '#f1f5f9',
+      muted: '#94a3b8'
+    },
+    neon: {
+      name: 'Neon Pink',
+      accent: '#22d3ee',
+      accent2: '#ec4899',
+      accent3: '#a855f7',
+      bg: '#080810',
+      panel: '#12121f',
+      text: '#ffffff',
+      muted: '#d1d5db'
+    }
+  };
+
+  function defaultThemeSettings() {
+    return {
+      preset: 'venom',
+      accent: '#59ffb1',
+      accent2: '#5ca8ff',
+      accent3: '#b18cff',
+      bg: '#03070c',
+      panel: '#0b1824',
+      text: '#eef8f4',
+      muted: '#8ea8a0',
+      opacity: 97,
+      glassOpacity: 52,
+      blur: 12,
+      glow: 55
+    };
+  }
+
+  function loadHeroTheme() {
+    try {
+      return { ...defaultThemeSettings(), ...JSON.parse(localStorage.getItem(NOVA_HERO_THEME_KEY) || '{}') };
+    } catch (_) {
+      return defaultThemeSettings();
+    }
+  }
+
+  function saveHeroTheme(theme) {
+    try {
+      l
