@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova HERO Intelligence Console
 // @namespace    https://github.com/kivkumah-oss/tampermonkey
-// @version      1.4.0
+// @version      1.4.1
 // @author       Martins / Nova
 // @description  Standalone Nova HERO Intelligence Console with Dark, Glass and fully custom Theme Studio.
 // @match        https://hero.eu.picking.aft.a2z.com/*
@@ -23,8 +23,8 @@
   if (window.__NOVA_HERO_STANDALONE_LOADER__) return;
   window.__NOVA_HERO_STANDALONE_LOADER__ = true;
 
-  const BASE = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/standalone/hero/payload/';
-  const PARTS = Array.from({ length: 13 }, (_, index) => `part-${String(index + 1).padStart(2, '0')}.txt`);
+  const BASE = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/standalone/hero/payload-gzip/';
+  const PARTS = Array.from({ length: 4 }, (_, index) => `payload-${String(index + 1).padStart(2, '0')}.b64`);
 
   function fetchText(url) {
     return new Promise((resolve, reject) => {
@@ -33,7 +33,7 @@
         url,
         timeout: 15000,
         onload(response) {
-          if (response.status >= 200 && response.status < 300) resolve(response.responseText);
+          if (response.status >= 200 && response.status < 300) resolve(response.responseText.trim());
           else reject(new Error(`HTTP ${response.status} while loading ${url}`));
         },
         onerror() {
@@ -46,14 +46,32 @@
     });
   }
 
+  async function decodePayload(base64) {
+    if (typeof DecompressionStream !== 'function') {
+      throw new Error('This browser does not support gzip payload decoding.');
+    }
+
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+
+    const stream = new Blob([bytes])
+      .stream()
+      .pipeThrough(new DecompressionStream('gzip'));
+
+    return new Response(stream).text();
+  }
+
   async function boot() {
     try {
       const chunks = [];
       for (const part of PARTS) chunks.push(await fetchText(BASE + part));
-      const source = `${chunks.join('')}\n//# sourceURL=nova-hero-intelligence.payload.js`;
-      Function(source)();
-      console.log('[Nova HERO] Standalone payload loaded', PARTS.length, 'parts');
+
+      const source = await decodePayload(chunks.join(''));
+      Function(`${source}\n//# sourceURL=nova-hero-intelligence.payload.js`)();
+      console.log('[Nova HERO] Standalone payload loaded', PARTS.length, 'compressed parts');
     } catch (error) {
+      window.__NOVA_HERO_STANDALONE_LOADER__ = false;
       console.error('[Nova HERO] Failed to load standalone payload', error);
       alert(`Nova HERO failed to load from GitHub.\n\n${error.message}`);
     }
