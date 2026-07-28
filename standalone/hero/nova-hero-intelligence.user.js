@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Nova HERO Intelligence Console
 // @namespace    https://github.com/kivkumah-oss/tampermonkey
-// @version      1.4.3
+// @version      1.6.1
 // @author       Martins / Nova
-// @description  Standalone Nova HERO Intelligence Console with Dark, Glass and fully custom Theme Studio.
+// @description  Standalone Nova HERO Intelligence Console v1.6.1 with guarded shipment reads, safe links, Theme Studio, and lazy timeline.
 // @match        https://hero.eu.picking.aft.a2z.com/*
 // @require      https://drive.corp.amazon.com/view/LCY3repart/lib/jquery.min.js
 // @require      https://drive.corp.amazon.com/view/LCY3repart/lib/waitForKeyElements.js
