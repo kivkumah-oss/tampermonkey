@@ -5,7 +5,7 @@ Nova Core is a reusable Tampermonkey framework for building browser tools.
 ## Project Structure
 
 - bootstrap/ – Tampermonkey entrypoint
-- core/ – shared engine (theme, session, trace, menu)
+- core/ – shared engine (theme, audio, reactor, session, trace, menu)
 - modules/ – module registry and future modules
 - docs/ – documentation and test guides
 - assets/ – images, icons, styles
@@ -13,6 +13,8 @@ Nova Core is a reusable Tampermonkey framework for building browser tools.
 ## Core Components
 
 - Nova Theme
+- Nova Audio Theme — real spectrum analysis, sensitivity/response shaping, and adaptive bass-hit events
+- Nova Reactor — reusable border pulses, circuit completion, core bursts, and panel echoes
 - Nova Session
 - Nova Trace
 - Nova Menu
@@ -29,7 +31,10 @@ Phase 3: Amazon modules
 - Collection Tool
 - Eagle Eye
 
-Phase 4: Nova Player
+Phase 4: Nova Player 🚧
+- Unified Suno and YouTube Music playback
+- Shared RGB/audio bus
+- Orbit Reactor and Orb Heart visuals
 
 ## Philosophy
 
