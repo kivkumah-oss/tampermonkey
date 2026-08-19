@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Core Bootstrap
 // @namespace    nova-core
-// @version      2.3.1
+// @version      2.3.2
 // @description  Install once. Nova Core, modules, updates, cache, recovery, and flicker-free site startup are managed automatically from GitHub.
 // @author       Martins + Nova
 // @match        *://*/*
@@ -19,6 +19,11 @@
 // @connect      *.cloudfront.net
 // @connect      cdn1.suno.ai
 // @connect      cdn-o.suno.com
+// @connect      hero.eu.picking.aft.a2z.com
+// @connect      a2z.com
+// @connect      amazon.com
+// @connect      drive.corp.amazon.com
+// @connect      drive-render.corp.amazon.com
 // @connect      *.amazon.com
 // @connect      *.a2z.com
 // @connect      amazon.co.uk
@@ -37,7 +42,7 @@
   if (window.__NOVA_BOOTSTRAP_RUNNING__) return;
   window.__NOVA_BOOTSTRAP_RUNNING__ = true;
 
-  const VERSION = '2.3.1';
+  const VERSION = '2.3.2';
   const MANIFEST_URL = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/nova.manifest.json';
   const TRUSTED_PREFIX = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/';
   const PREFIX = 'nova.bootstrap.v2.';
