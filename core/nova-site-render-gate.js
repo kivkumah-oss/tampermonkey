@@ -4,7 +4,7 @@
 
   if (window.NovaSiteRenderGate) return;
 
-  const VERSION = '1.1.0';
+  const VERSION = '1.1.1';
   const FETCH_FLAG = '__novaSiteRenderGateFetch';
   const READY_EVENT = 'nova-site-render-ready';
   const SCREEN_ID = 'nova-site-render-screen';
@@ -328,7 +328,7 @@
   }
 
   function scheduleHeroReadyCheck(reason = 'request-finished', targetCycle = cycle) {
-    clearTimeout(readyTimer);
+    if (readyTimer) return;
 
     readyTimer = setTimeout(() => {
       readyTimer = null;
