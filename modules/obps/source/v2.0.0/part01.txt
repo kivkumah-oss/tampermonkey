@@ -1,0 +1,81 @@
+    const out=new Array(items.length); let next=0;
+    async function worker() {
+      while (true) {
+        const i=next++; if (i>=items.length) return;
+        try { out[i]=await fn(items[i],i); } catch (e) { out[i]={ error:String(e?.message||e) }; }
+      }
+    }
+    await Promise.all(Array.from({length:Math.max(1,Math.min(limit,items.length||1))},worker));
+    return out;
+  }
+
+  function shipmentId(v) {
+    const s=norm(v).toUpperCase();
+    const m=s.match(/\b(TBA[0-9A-Z]+|\d{8,}|[A-Z0-9]{8,}-[A-Z0-9-]+)\b/);
+    return m?m[1]:'';
+  }
+  function condition(v) {
+    const s=norm(v).toUpperCase(); const m=s.match(/\bC\s*([0-9]{1,4})\b/); return m?`C${m[1]}`:s;
+  }
+  function epoch(v) {
+    if (v==null||v==='') return 0;
+    if (typeof v==='number') return v<1e12?v*1000:v;
+    const s=norm(v); if (/^\d{10,13}$/.test(s)) { const n=Number(s); return s.length<=10?n*1000:n; }
+    const d=Date.parse(s); return Number.isFinite(d)?d:0;
+  }
+
+  function headers(table) {
+    const cells=[...table.querySelectorAll('thead th')];
+    const arr=cells.length?cells:[...(table.querySelector('tr')?.querySelectorAll('th,td')||[])];
+    const map={}; arr.forEach((c,i)=>{const k=key(c.textContent);if(k)map[k]=i;}); return map;
+  }
+  function col(map,names) {
+    for (const n of names) if (Number.isInteger(map[key(n)])) return map[key(n)];
+    for (const [k,i] of Object.entries(map)) if (names.some(n=>k.includes(key(n))||key(n).includes(k))) return i;
+    return -1;
+  }
+  function cell(cells,i){return i>=0?norm(cells[i]?.textContent):'';}
+
+  const RODEO_COLUMNS=['DEMAND_ID','OUTER_CONTAINER_TYPE','OUTER_SCANNABLE_ID','SORT_CODE','CONDITION','PICK_BATCH_ID','SHIPMENT_ID','SCANNABLE_ID','PROCESS_PATH','EXPECTED_SHIP_DATE','QUANTITY','WORK_POOL','DWELL_TIME'];
+  function rodeoUrl(batch){const p=new URLSearchParams();p.append('_enabledColumns','on');RODEO_COLUMNS.forEach(c=>p.append('enabledColumns',c));p.append('searchKey',batch.join(' '));return `${ENDPOINTS.rodeo}?${p}`;}
+  function findRodeoTable(doc){return doc.querySelector('.result-table')||[...doc.querySelectorAll('table')].sort((a,b)=>b.querySelectorAll('tr').length-a.querySelectorAll('tr').length)[0]||null;}
+
+  function parseRodeo(html) {
+    const doc=new DOMParser().parseFromString(html,'text/html'); const table=findRodeoTable(doc); if(!table) throw new Error('Rodeo table missing');
+    const hm=headers(table); const ix={
+      outer:col(hm,['Outer Scannable ID','Outer Scannable']), scan:col(hm,['Scannable ID']), ship:col(hm,['Shipment ID','Demand ID','Customer Shipment ID','Transfer Request ID']),
+      cond:col(hm,['Condition','Status']), path:col(hm,['Process Path','Work Pool']), cpt:col(hm,['Expected Ship Date','CPT','Ship By','Need To Ship By Date']), qty:col(hm,['Quantity','Qty'])
+    };
+    const rows=[...table.querySelectorAll('tbody tr')]; const use=rows.length?rows:[...table.querySelectorAll('tr')].slice(1); const out=[];
+    for (const tr of use) {
+      const cells=[...tr.querySelectorAll('td')]; if(!cells.length) continue; const texts=cells.map(c=>norm(c.textContent));
+      let chute=[cell(cells,ix.outer),cell(cells,ix.scan),...texts].map(x=>x.toUpperCase()).find(x=>knownChutes.has(x));
+      if(!chute) chute=norm(tr.textContent).toUpperCase().match(/CHPSAFEW\d{2}[BCDE]\d/)?.[0]||'';
+      if(!knownChutes.has(chute)) continue;
+      out.push({chute,shipment:shipmentId(cell(cells,ix.ship)),condition:condition(cell(cells,ix.cond)),path:cell(cells,ix.path),cptMs:epoch(cell(cells,ix.cpt)),qty:Math.max(1,parseInt(cell(cells,ix.qty).replace(/\D/g,''),10)||1)});
+    }
+    return out;
+  }
+
+  function carryRecentFc(fresh) {
+    const now=Date.now();
+    for (const [id,prev] of state.chutes) {
+      if (!prev || !fresh.has(id)) continue;
+      if (!['FC_CONFIRMED_EMPTY','FC_CONFIRMED_OCCUPIED'].includes(prev.truth)) continue;
+      if (!prev.lastFcCheckedAt || now-prev.lastFcCheckedAt>SETTINGS.fcFreshMs) continue;
+      const cur=fresh.get(id);
+      if (cur.truth==='RODEO_UNSEEN') fresh.set(id,{...prev,source:'F',confidence:'MEDIUM'});
+    }
+  }
+
+  async function scanRodeo() {
+    const fresh=new Map(allChutes.map(m=>[m.id,blankTruth(m)])); carryRecentFc(fresh);
+    const batches=[]; for(let i=0;i<allChutes.length;i+=SETTINGS.rodeoBatchSize)batches.push(allChutes.slice(i,i+SETTINGS.rodeoBatchSize).map(x=>x.id));
+    const results=await mapLimit(batches,1,async batch=>{try{return {batch,rows:parseRodeo(await gmGet(rodeoUrl(batch)))};}catch(e){return {batch,error:String(e?.message||e)};}});
+    for(const result of results){
+      if(result?.error){for(const id of result.batch||[]){const t=fresh.get(id);if(t&&t.truth==='RODEO_UNSEEN'){t.truth='RODEO_BATCH_ERROR';t.error=result.error;t.source='!';}}continue;}
+      for(const row of result?.rows||[]){const t=fresh.get(row.chute);if(!t)continue;t.occupied=true;t.truth='RODEO_OCCUPIED';t.confidence='HIGH';t.source='R';t.lastVerifiedAt=Date.now();t.lastRodeoSeenAt=Date.now();if(row.shipment&&!t.shipments.includes(row.shipment))t.shipments.push(row.shipment);t.totalQty+=row.qty;if(row.condition)t.condition=row.condition;if(row.path)t.processPath=row.path;if(row.cptMs&&(!t.cptMs||row.cptMs<t.cptMs))t.cptMs=row.cptMs;t.ownerQty.cs+=row.qty;if(row.shipment)state.shipmentMemory.set(row.shipment,{condition:row.condition,path:row.path,cptMs:row.cptMs,at:Date.now()});}
+    }
+    return fresh;
+  }
+
