@@ -1,0 +1,35 @@
+    targets.sort((a,b)=>{const ar=a.t.cptMs?(a.t.cptMs-Date.now())/60000:99999,br=b.t.cptMs?(b.t.cptMs-Date.now())/60000:99999;const as=(a.t.condition==='C15'?10000:0)+(ar<=30?8000:ar<=60?6000:ar<=90?4000:0)+(a.t.flags.length?1000:0);const bs=(b.t.condition==='C15'?10000:0)+(br<=30?8000:br<=60?6000:br<=90?4000:0)+(b.t.flags.length?1000:0);return bs-as||ar-br;});
+    const unique=[];const seen=new Set();for(const x of targets){if(!seen.has(x.sid)){seen.add(x.sid);unique.push(x);}if(unique.length>=SETTINGS.pcMax)break;}
+    await mapLimit(unique,SETTINGS.pcConcurrency,async x=>{try{const data=pcExtract(JSON.parse(await gmGet(ENDPOINTS.pc+encodeURIComponent(x.sid),'application/json,*/*')));for(const t of map.values())if(t.shipments.includes(x.sid)){if(!t.condition&&data.cond)t.condition=data.cond;if(!t.processPath&&data.path)t.processPath=data.path;if(!t.cptMs&&data.cptMs)t.cptMs=data.cptMs;}state.shipmentMemory.set(x.sid,{condition:data.cond,path:data.path,cptMs:data.cptMs,at:Date.now()});}catch(_){}});
+  }
+
+  function heroRunner(json){const text=walk(json).map(([k,v])=>`${k}:${typeof v==='string'?v:''}`).join(' ').toUpperCase();if(!/RUNNER|HOT ?PICK|SEND ?RUNNER|REQUESTED/.test(text))return'';if(/P2R ?P4|P2RP4|P4/.test(text))return'P4 runner';if(/P2R ?P3|P2RP3|P3/.test(text))return'P3 runner';if(/P2R ?P2|P2RP2|P2/.test(text))return'P2 runner';if(/AFE/.test(text))return'AFE runner';if(/HOT ?PICK/.test(text))return'Hotpick';return'Runner requested';}
+  async function enrichHero(map){const now=Date.now();const targets=[];const seen=new Set();for(const t of map.values()){const mins=t.cptMs?(t.cptMs-now)/60000:null;if(t.condition==='C15'||(mins!=null&&mins<=60))for(const sid of t.shipments)if(!seen.has(sid)){seen.add(sid);targets.push({sid,t});}}await mapLimit(targets.slice(0,SETTINGS.heroMax),SETTINGS.heroConcurrency,async x=>{const cached=state.heroCache.get(x.sid);if(cached&&now-cached.at<300000){x.t.runner=cached.runner;return;}try{const r=heroRunner(JSON.parse(await gmGet(ENDPOINTS.hero+encodeURIComponent(x.sid),'application/json,*/*')));state.heroCache.set(x.sid,{runner:r,at:now});for(const t of map.values())if(t.shipments.includes(x.sid))t.runner=r;}catch(_){}});}
+
+  function applyDuplicateFlags(map){const by=new Map();for(const t of map.values())for(const sid of t.shipments){if(!by.has(sid))by.set(sid,[]);by.get(sid).push(t.id);}for(const ids of by.values())if(ids.length>1)for(const id of ids){const t=map.get(id);if(t&&!t.flags.includes('CS_MULTI_CHUTE'))t.flags.push('CS_MULTI_CHUTE');}}
+
+  function classifyRisk(t){
+    const mins=t.cptMs?(t.cptMs-Date.now())/60000:null;t.minutesToCpt=mins;const reasons=[];
+    if(t.ownerQty.unowned){reasons.push(`UNOWNED ${t.ownerQty.unowned}`);}if(t.ownerQty.whse){reasons.push(`WHSE ${t.ownerQty.whse}`);}if(t.ownerQty.workOrder){reasons.push(`WORK ORDER ${t.ownerQty.workOrder}`);}if(t.flags.includes('CS_MULTI_CHUTE'))reasons.push('SAME CS MULTI-CHUTE');if(t.flags.includes('MULTI_CS'))reasons.push('MULTI CS');
+    if(reasons.length){t.riskReason=reasons.join(' · ');return['ACT NOW',100];}
+    if(t.truth==='RODEO_BATCH_ERROR'||t.flags.includes('FC_READ_ERROR')){t.riskReason=t.error||'Read failure';return['VERIFY',78];}
+    if(mins!=null&&mins<0){t.riskReason=`CPT overdue ${Math.abs(Math.round(mins))}m`;return['ACT NOW',100];}
+    if(t.condition==='C15'&&mins!=null&&mins<=60){t.riskReason=`C15 · ${Math.round(mins)}m to CPT`;return['ACT NOW',96];}
+    if(mins!=null&&mins<=30){t.riskReason=`${Math.round(mins)}m to CPT`;return['ACT NOW',92];}
+    if(mins!=null&&mins<=60){t.riskReason=`${Math.round(mins)}m to CPT`;return['WATCH',72];}
+    if(mins!=null&&mins<=90){t.riskReason=`${Math.round(mins)}m to CPT`;return['WATCH',55];}
+    if(t.condition==='C5'){t.riskReason='C5 cleanup';return['CLEANUP',30];}
+    if(t.occupied){t.riskReason=t.condition||'Occupied';return['WATCH',35];}
+    if(t.truth==='FC_CONFIRMED_EMPTY'){t.riskReason='FC confirmed empty';return['CLEAR',0];}
+    t.riskReason='Not FC verified';return['VERIFY',20];
+  }
+
+  function finalize(map){applyDuplicateFlags(map);for(const t of map.values()){const[r,rank]=classifyRisk(t);t.risk=r;t.riskRank=rank;}}
+
+  async function refresh(force=false){
+    if(state.refreshing)return false;state.refreshing=true;state.lastError='';state.status='Reading Rodeo…';render();
+    try{const map=await scanRodeo();state.status='Verifying Rodeo-unseen chutes in FCResearch…';render();const fc=await verifyFc(map);state.status='Enriching shipment context…';render();await enrichPc(map);finalize(map);await enrichHero(map);finalize(map);state.chutes=map;state.lastUpdated=Date.now();state.firstLoad=false;state.status=`Updated · FC ${fc.occupied}/${fc.checked} occupied checks · ${fc.errors} FC errors`;}
+    catch(e){state.lastError=String(e?.message||e);state.status='Refresh failed';console.error('[Nova OBPS]',e);}finally{state.refreshing=false;render();}return true;
+  }
+
+  function stats(){
