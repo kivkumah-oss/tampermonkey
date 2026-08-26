@@ -1,0 +1,28 @@
+  function bestInventoryTable(doc){let best=null,score=-1;for(const table of doc.querySelectorAll('table')){const h=norm([...table.querySelectorAll('th')].map(x=>x.textContent).join(' ')).toLowerCase();let s=table.querySelectorAll('tr').length;if(h.includes('consumer'))s+=10;if(h.includes('disposition'))s+=10;if(h.includes('quantity'))s+=5;if(h.includes('asin'))s+=3;if(s>score){score=s;best=table;}}return best;}
+  function classifyOwner(text){const s=norm(text).toUpperCase();if(/CUSTOMER[_ ]?SHIPMENT|CUSTOMERSHIPMENT/.test(s))return'cs';if(/WORK[_ ]?ORDER|WORKORDER/.test(s))return'workOrder';if(/WHSE|WAREHOUSE/.test(s))return'whse';if(/UNOWNED|NO OWNER|NO CONSUMER/.test(s))return'unowned';return'unknown';}
+  function classifyDisp(text){const s=norm(text).toUpperCase();if(s.includes('SELLABLE'))return'sellable';if(s.includes('PENDING')&&s.includes('RESEARCH'))return'pr';if(/DAMAGED|DEFECT|UNSELLABLE/.test(s))return'damaged';return'other';}
+
+  function parseFc(html){
+    const doc=new DOMParser().parseFromString(html,'text/html');const table=bestInventoryTable(doc);const inv={total:0,ownerQty:{cs:0,whse:0,workOrder:0,unowned:0,unknown:0},dispositionQty:{sellable:0,pr:0,damaged:0,other:0},shipments:[],flags:[]};if(!table)return inv;
+    const hm=headers(table);const ix={qty:col(hm,['Quantity','Qty']),disp:col(hm,['Disposition']),consumer:col(hm,['Consumer','Owner','Consumer Type']),consumerId:col(hm,['Consumer ID','ConsumerId','Owner ID'])};const rows=[...table.querySelectorAll('tbody tr')];const use=rows.length?rows:[...table.querySelectorAll('tr')].slice(1);
+    for(const tr of use){const cells=[...tr.querySelectorAll('td')];if(!cells.length)continue;const qty=Math.max(1,parseInt(cell(cells,ix.qty).replace(/\D/g,''),10)||1);const ownerText=[cell(cells,ix.consumer),cell(cells,ix.consumerId),norm(tr.textContent)].join(' ');const o=classifyOwner(ownerText);inv.ownerQty[o]+=qty;const d=classifyDisp(cell(cells,ix.disp));inv.dispositionQty[d]+=qty;inv.total+=qty;if(o==='cs'){const sid=shipmentId(cell(cells,ix.consumerId))||shipmentId(norm(tr.textContent));if(sid&&!inv.shipments.includes(sid))inv.shipments.push(sid);}}
+    if(inv.ownerQty.unowned)inv.flags.push('UNOWNED');if(inv.ownerQty.whse)inv.flags.push('WHSE');if(inv.ownerQty.workOrder)inv.flags.push('WORK_ORDER');if(inv.ownerQty.unknown)inv.flags.push('UNKNOWN_OWNER');if(inv.dispositionQty.pr)inv.flags.push('PENDING_RESEARCH');if(inv.dispositionQty.damaged)inv.flags.push('DAMAGED');if(inv.shipments.length>1)inv.flags.push('MULTI_CS');return inv;
+  }
+
+  function fcCandidates(map){
+    const arr=[...map.values()].filter(t=>t.truth==='RODEO_UNSEEN'||t.truth==='RODEO_BATCH_ERROR');if(!arr.length)return[];
+    arr.sort((a,b)=>(a.truth==='RODEO_BATCH_ERROR'?-1:0)-(b.truth==='RODEO_BATCH_ERROR'?-1:0));
+    const start=state.fcCursor%arr.length;const rotated=arr.slice(start).concat(arr.slice(0,start));const pick=rotated.slice(0,SETTINGS.fcChecksPerRefresh);state.fcCursor=(start+pick.length)%arr.length;return pick;
+  }
+
+  async function verifyFc(map){
+    const targets=fcCandidates(map);let checked=0,occupied=0,errors=0;
+    await mapLimit(targets,SETTINGS.fcConcurrency,async t=>{try{const inv=parseFc(await gmGet(ENDPOINTS.fc+encodeURIComponent(t.id)));const cur=map.get(t.id);if(!cur)return;checked++;cur.lastVerifiedAt=Date.now();cur.lastFcCheckedAt=Date.now();cur.confidence='HIGH';cur.source='F';cur.error='';cur.ownerQty=inv.ownerQty;cur.dispositionQty=inv.dispositionQty;cur.flags=[...new Set([...(cur.flags||[]),...inv.flags])];if(inv.total>0){occupied++;cur.occupied=true;cur.truth='FC_CONFIRMED_OCCUPIED';cur.totalQty=Math.max(cur.totalQty,inv.total);for(const sid of inv.shipments)if(!cur.shipments.includes(sid))cur.shipments.push(sid);for(const sid of cur.shipments){const m=state.shipmentMemory.get(sid);if(m&&Date.now()-m.at<SETTINGS.shipmentMemoryMs){if(!cur.condition&&m.condition)cur.condition=m.condition;if(!cur.processPath&&m.path)cur.processPath=m.path;if(!cur.cptMs&&m.cptMs)cur.cptMs=m.cptMs;}}}else{cur.occupied=false;cur.truth='FC_CONFIRMED_EMPTY';cur.totalQty=0;}}catch(e){errors++;const cur=map.get(t.id);if(cur){cur.error=String(e?.message||e);if(!cur.flags.includes('FC_READ_ERROR'))cur.flags.push('FC_READ_ERROR');}}});
+    return {checked,occupied,errors};
+  }
+
+  function walk(obj,depth=0,out=[]){if(depth>6||obj==null)return out;if(Array.isArray(obj)){obj.forEach(v=>walk(v,depth+1,out));return out;}if(typeof obj==='object'){for(const [k,v] of Object.entries(obj)){out.push([k,v]);walk(v,depth+1,out);}}return out;}
+  function pcExtract(json){let cond='',path='',cptMs=0;for(const [k,v] of walk(json)){const kk=key(k);const s=typeof v==='string'||typeof v==='number'?String(v):'';if(!cond&&/(condition|shipmentstate|status)/.test(kk)){const c=condition(s);if(/^C\d+$/.test(c))cond=c;}if(!path&&/(processpath|workpool)/.test(kk)&&s.length<100)path=norm(s);if(!cptMs&&/(cpt|expectedship|shipby|needtoship)/.test(kk))cptMs=epoch(v);}return{cond,path,cptMs};}
+
+  async function enrichPc(map){
+    const targets=[];for(const t of map.values())for(const sid of t.shipments)if(!t.condition||!t.processPath||!t.cptMs)targets.push({sid,t});
