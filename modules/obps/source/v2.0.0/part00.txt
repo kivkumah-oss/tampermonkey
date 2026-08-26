@@ -1,0 +1,149 @@
+// modules/obps/nova-obps-risk-engine.js
+// Nova OB PS Control Center v2.0.0 — direct full-style wall module
+(function () {
+  'use strict';
+
+  const API = 'NovaOBPSRiskEngine';
+  const MODULE_ID = 'nova-obps-risk-engine';
+  const VERSION = '2.0.0';
+  const FC = 'NCL1';
+
+  if (window[API]?.directModule === true) {
+    try { window[API].show?.(); } catch (_) {}
+    return;
+  }
+  try { document.getElementById('nova-obps-loader-status')?.remove(); } catch (_) {}
+
+  const SETTINGS = {
+    refreshMs: 30000,
+    requestTimeout: 20000,
+    rodeoBatchSize: 40,
+    fcChecksPerRefresh: 40,
+    fcConcurrency: 3,
+    pcMax: 12,
+    pcConcurrency: 2,
+    heroMax: 10,
+    heroConcurrency: 2,
+    fcFreshMs: 180000,
+    shipmentMemoryMs: 12 * 60 * 1000,
+    watchMin: 90,
+    riskMin: 60,
+    criticalMin: 30
+  };
+
+  const ENDPOINTS = {
+    rodeo: `https://rodeo-dub.amazon.com/${FC}/Search`,
+    fc: `https://fcresearch-eu.aka.amazon.com/${FC}/results/inventory?s=`,
+    pc: `https://picking-console.eu.picking.aft.a2z.com/api/fcs/${FC}/pick-research/type/customer-shipment/id/`,
+    hero: `https://hero.eu.picking.aft.a2z.com/api/fcs/${FC}/entities/type/CUSTOMER_SHIPMENT/id/`,
+    heroPage: `https://hero.eu.picking.aft.a2z.com/fc/${FC}/pick-events/customer-shipment/`
+  };
+
+  const WALL = {
+    prefix: 'chPSAFEW',
+    rows: ['B', 'C', 'D', 'E'],
+    bays: [
+      ['07', [1,2,3,4,5,6]], ['08', [1,2,3,4]], ['09', [1,2,3,4,5,6]],
+      ['10', [1,2,3,4]], ['11', [1,2,3,4,5,6]], ['12', [1,2,3,4]]
+    ]
+  };
+
+  const STORE = {
+    pos: 'nova.obps.v2.position',
+    size: 'nova.obps.v2.size',
+    focus: 'nova.obps.v2.focus',
+    bays: 'nova.obps.v2.expandedBays',
+    selected: 'nova.obps.v2.selected',
+    minimized: 'nova.obps.v2.minimized'
+  };
+
+  const state = {
+    host: null,
+    shadow: null,
+    timer: null,
+    refreshing: false,
+    visible: true,
+    minimized: loadBool(STORE.minimized, false),
+    selected: loadText(STORE.selected, ''),
+    focus: loadText(STORE.focus, 'overview'),
+    expandedBays: loadSet(STORE.bays, WALL.bays.map(x => x[0])),
+    lastUpdated: 0,
+    lastError: '',
+    status: 'Starting…',
+    fcCursor: 0,
+    chutes: new Map(),
+    shipmentMemory: new Map(),
+    heroCache: new Map(),
+    firstLoad: true
+  };
+
+  const allChutes = [];
+  for (const row of WALL.rows) {
+    for (const [bay, slots] of WALL.bays) {
+      for (const slot of slots) allChutes.push({ id: `${WALL.prefix}${bay}${row}${slot}`, row, bay, slot });
+    }
+  }
+  const knownChutes = new Set(allChutes.map(x => x.id.toUpperCase()));
+
+  function loadText(key, fallback='') { try { return localStorage.getItem(key) ?? fallback; } catch (_) { return fallback; } }
+  function saveText(key, value) { try { localStorage.setItem(key, String(value ?? '')); } catch (_) {} }
+  function loadBool(key, fallback=false) { const x=loadText(key,''); return x===''?fallback:x==='1'; }
+  function saveBool(key, value) { saveText(key, value ? '1' : '0'); }
+  function loadSet(key, fallback=[]) { try { const raw=localStorage.getItem(key); const a=raw?JSON.parse(raw):fallback; return new Set(Array.isArray(a)?a:fallback); } catch (_) { return new Set(fallback); } }
+  function saveSet(key, set) { try { localStorage.setItem(key, JSON.stringify([...set])); } catch (_) {} }
+  function loadJson(key) { try { const x=localStorage.getItem(key); return x?JSON.parse(x):null; } catch (_) { return null; } }
+  function saveJson(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {} }
+
+  const norm = v => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  const key = v => norm(v).toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const pad2 = n => String(n).padStart(2,'0');
+
+  function fmtTime(ms) {
+    if (!ms) return '--:--';
+    const d=new Date(ms); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  }
+  function fmtStamp(ms) { return ms ? new Date(ms).toLocaleTimeString('en-GB') : '--:--:--'; }
+
+  function blankTruth(meta) {
+    return {
+      ...meta,
+      occupied: false,
+      truth: 'RODEO_UNSEEN',
+      confidence: 'LOW',
+      source: '?',
+      lastVerifiedAt: 0,
+      lastRodeoSeenAt: 0,
+      lastFcCheckedAt: 0,
+      error: '',
+      shipments: [],
+      totalQty: 0,
+      condition: '',
+      cptMs: 0,
+      processPath: '',
+      ownerQty: { cs: 0, whse: 0, workOrder: 0, unowned: 0, unknown: 0 },
+      dispositionQty: { sellable: 0, pr: 0, damaged: 0, other: 0 },
+      flags: [],
+      runner: '',
+      risk: 'VERIFY',
+      riskRank: 20,
+      riskReason: 'Not FC verified',
+      minutesToCpt: null
+    };
+  }
+  allChutes.forEach(meta => state.chutes.set(meta.id, blankTruth(meta)));
+
+  function gmGet(url, accept='text/html,application/json,*/*') {
+    return new Promise((resolve,reject) => {
+      if (typeof GM_xmlhttpRequest !== 'function') return reject(new Error('GM_xmlhttpRequest unavailable'));
+      GM_xmlhttpRequest({
+        method:'GET', url, timeout:SETTINGS.requestTimeout,
+        headers:{ Accept:accept, 'Cache-Control':'no-cache' },
+        onload:r => r.status>=200 && r.status<300 ? resolve(String(r.responseText||'')) : reject(new Error(`HTTP ${r.status} ${url}`)),
+        onerror:() => reject(new Error(`Network error ${url}`)),
+        ontimeout:() => reject(new Error(`Timeout ${url}`))
+      });
+    });
+  }
+
+  async function mapLimit(items, limit, fn) {
