@@ -1,42 +1,42 @@
 // modules/obps/nova-obps-risk-engine.js
-// Nova OB PS Risk Engine v1.3.0 — hardened full-wall loader.
+// Nova OB PS Control Center v2.0.0 — plain-source bootstrap loader
 (function () {
   'use strict';
 
   const API = 'NovaOBPSRiskEngine';
-  const VERSION = '1.3.0';
-  const BASE = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/obps/payload/';
-  const PARTS = [
-    'obps-full-wall-v1.1.0.part1.txt',
-    'obps-full-wall-v1.1.0.part2.txt',
-    'obps-full-wall-v1.1.0.part3.txt'
-  ];
+  const VERSION = '2.0.0';
+  const BASE = 'https://raw.githubusercontent.com/kivkumah-oss/tampermonkey/main/modules/obps/source/v2.0.0/';
+  const PARTS = Array.from({ length: 9 }, (_, i) => `part${String(i).padStart(2, '0')}.txt`);
 
-  if (window[API] && window[API].loaderVersion === VERSION) return;
+  if (window[API]?.directModule === true) {
+    try { window[API].show?.(); } catch (_) {}
+    return;
+  }
+  if (window[API]?.loaderVersion === VERSION) return;
 
   let realApi = null;
   let loadError = null;
   let wantVisible = true;
   let wantRefresh = false;
-  let statusNode = null;
+  let badge = null;
 
-  function showStatus(text, error = false) {
+  function status(text, isError = false) {
     try {
-      if (!statusNode || !statusNode.isConnected) {
-        statusNode = document.createElement('div');
-        statusNode.id = 'nova-obps-loader-status';
-        statusNode.style.cssText = 'position:fixed;left:18px;top:18px;z-index:2147483646;padding:10px 13px;border-radius:10px;background:#07110d;color:#8fffc2;border:1px solid #1d8055;box-shadow:0 8px 30px rgba(0,0,0,.28);font:700 12px/1.35 Arial,sans-serif;max-width:620px';
-        (document.body || document.documentElement).appendChild(statusNode);
+      if (!badge?.isConnected) {
+        badge = document.createElement('div');
+        badge.id = 'nova-obps-loader-status';
+        badge.style.cssText = 'position:fixed;left:16px;top:16px;z-index:2147483646;padding:9px 12px;border-radius:10px;background:#0b1324;color:#b9d2ff;border:1px solid #315ca8;box-shadow:0 10px 30px rgba(0,0,0,.32);font:800 11px/1.35 Arial,sans-serif;max-width:560px';
+        (document.body || document.documentElement).appendChild(badge);
       }
-      statusNode.style.color = error ? '#ff9a9a' : '#8fffc2';
-      statusNode.style.borderColor = error ? '#8b3030' : '#1d8055';
-      statusNode.textContent = text;
+      badge.style.color = isError ? '#ffb2b2' : '#b9d2ff';
+      badge.style.borderColor = isError ? '#a43d3d' : '#315ca8';
+      badge.textContent = text;
     } catch (_) {}
   }
 
   function clearStatus() {
-    try { statusNode?.remove(); } catch (_) {}
-    statusNode = null;
+    try { badge?.remove(); } catch (_) {}
+    badge = null;
   }
 
   const proxy = {
@@ -46,24 +46,24 @@
     loaded: true,
     show() {
       wantVisible = true;
-      if (realApi && typeof realApi.show === 'function') return realApi.show();
-      showStatus(loadError ? `OB PS wall failed: ${loadError.message || loadError}` : 'Loading full OB PS wall…', Boolean(loadError));
+      if (realApi?.show) return realApi.show();
+      status(loadError ? `OB PS wall failed: ${loadError.message || loadError}` : 'Loading OB PS Control Center…', Boolean(loadError));
       return true;
     },
     hide() {
       wantVisible = false;
       clearStatus();
-      if (realApi && typeof realApi.hide === 'function') return realApi.hide();
+      if (realApi?.hide) return realApi.hide();
       return true;
     },
     refresh() {
       wantRefresh = true;
-      if (realApi && typeof realApi.refresh === 'function') return realApi.refresh();
+      if (realApi?.refresh) return realApi.refresh();
       return true;
     },
     getState() {
-      if (realApi && typeof realApi.getState === 'function') return realApi.getState();
-      return { loading: !loadError, error: loadError ? String(loadError) : null, fullWall: true, version: VERSION };
+      if (realApi?.getState) return realApi.getState();
+      return { loading: !loadError, error: loadError ? String(loadError) : null, version: VERSION };
     }
   };
 
@@ -71,10 +71,7 @@
 
   function gmText(url) {
     return new Promise((resolve, reject) => {
-      if (typeof GM_xmlhttpRequest !== 'function') {
-        reject(new Error('GM_xmlhttpRequest unavailable'));
-        return;
-      }
+      if (typeof GM_xmlhttpRequest !== 'function') return reject(new Error('GM_xmlhttpRequest unavailable'));
       GM_xmlhttpRequest({
         method: 'GET',
         url,
@@ -82,58 +79,27 @@
         headers: { Accept: 'text/plain', 'Cache-Control': 'no-cache' },
         onload(r) {
           if (r.status >= 200 && r.status < 300) resolve(String(r.responseText || ''));
-          else reject(new Error(`HTTP ${r.status} for ${url}`));
+          else reject(new Error(`HTTP ${r.status} loading ${url}`));
         },
-        onerror: () => reject(new Error(`Network error for ${url}`)),
-        ontimeout: () => reject(new Error(`Timeout for ${url}`))
+        onerror: () => reject(new Error(`Network error loading ${url}`)),
+        ontimeout: () => reject(new Error(`Timeout loading ${url}`))
       });
     });
   }
 
-  function normalizeBase64(value) {
-    let clean = String(value || '')
-      .replace(/\s+/g, '')
-      .replace(/-/g, '+')
-      .replace(/_/g, '/')
-      .replace(/[^A-Za-z0-9+/=]/g, '');
-
-    const firstPad = clean.indexOf('=');
-    if (firstPad !== -1 && firstPad < clean.length - 2) {
-      clean = clean.replace(/=/g, '');
-    }
-    while (clean.length % 4) clean += '=';
-    return clean;
-  }
-
-  function base64Bytes(value) {
-    const clean = normalizeBase64(value);
-    const binary = atob(clean);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-  }
-
-  async function gunzip(bytes) {
-    if (typeof DecompressionStream !== 'function') {
-      throw new Error('Browser gzip decoder unavailable');
-    }
-    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-    const buffer = await new Response(stream).arrayBuffer();
-    return new TextDecoder().decode(buffer);
-  }
-
-  async function loadFullWall() {
+  async function load() {
     try {
       const chunks = [];
       for (let i = 0; i < PARTS.length; i += 1) {
-        showStatus(`Loading full OB PS wall… ${i + 1}/${PARTS.length}`);
-        chunks.push(await gmText(`${BASE}${PARTS[i]}?v=${VERSION}&ts=${Date.now()}`));
+        status(`Loading OB PS Control Center… ${i + 1}/${PARTS.length}`);
+        chunks.push(await gmText(`${BASE}${PARTS[i]}?v=${VERSION}`));
       }
 
-      showStatus('Decoding full OB PS wall…');
-      let code = await gunzip(base64Bytes(chunks.join('')));
-      code = code.replace("const MODULE_VERSION = '1.1.0';", "const MODULE_VERSION = '1.3.0';");
+      const code = chunks.join('');
+      if (!code.includes("const VERSION = '2.0.0'")) throw new Error('Joined source failed version check');
+      if (!code.includes('window[API]={id:MODULE_ID')) throw new Error('Joined source is incomplete');
 
+      status('Starting OB PS Control Center…');
       const runner = new Function(
         'GM_xmlhttpRequest',
         'GM_getValue',
@@ -142,45 +108,36 @@
         'GM_addValueChangeListener',
         'GM_registerMenuCommand',
         'unsafeWindow',
-        code + '\n//# sourceURL=nova://module/nova-obps-risk-engine-full-wall.js'
+        code + '\n//# sourceURL=nova://module/nova-obps-control-center-v2.js'
       );
 
-      try { delete window[API]; } catch (_) { window[API] = undefined; }
-
-      try {
-        runner.call(
-          window,
-          typeof GM_xmlhttpRequest === 'function' ? GM_xmlhttpRequest : undefined,
-          typeof GM_getValue === 'function' ? GM_getValue : undefined,
-          typeof GM_setValue === 'function' ? GM_setValue : undefined,
-          typeof GM_deleteValue === 'function' ? GM_deleteValue : undefined,
-          typeof GM_addValueChangeListener === 'function' ? GM_addValueChangeListener : undefined,
-          typeof GM_registerMenuCommand === 'function' ? GM_registerMenuCommand : undefined,
-          typeof unsafeWindow !== 'undefined' ? unsafeWindow : window
-        );
-      } catch (error) {
-        window[API] = proxy;
-        throw error;
-      }
+      runner.call(
+        window,
+        typeof GM_xmlhttpRequest === 'function' ? GM_xmlhttpRequest : undefined,
+        typeof GM_getValue === 'function' ? GM_getValue : undefined,
+        typeof GM_setValue === 'function' ? GM_setValue : undefined,
+        typeof GM_deleteValue === 'function' ? GM_deleteValue : undefined,
+        typeof GM_addValueChangeListener === 'function' ? GM_addValueChangeListener : undefined,
+        typeof GM_registerMenuCommand === 'function' ? GM_registerMenuCommand : undefined,
+        typeof unsafeWindow !== 'undefined' ? unsafeWindow : window
+      );
 
       realApi = window[API];
-      if (!realApi || realApi === proxy || typeof realApi.show !== 'function') {
-        window[API] = proxy;
-        throw new Error('Full wall executed but did not expose NovaOBPSRiskEngine');
+      if (!realApi || realApi === proxy || realApi.directModule !== true) {
+        throw new Error('Direct OB PS module did not expose its API');
       }
 
       clearStatus();
-      if (wantVisible) realApi.show();
-      else if (typeof realApi.hide === 'function') realApi.hide();
-      if (wantRefresh && typeof realApi.refresh === 'function') realApi.refresh();
-      console.log('[Nova OBPS] Full wall v1.3.0 loaded.');
+      if (wantVisible) realApi.show?.(); else realApi.hide?.();
+      if (wantRefresh) realApi.refresh?.();
+      console.log('[Nova OBPS] v2.0.0 direct source loaded');
     } catch (error) {
       loadError = error;
       window[API] = proxy;
-      showStatus(`OB PS wall failed: ${error?.message || String(error)}`, true);
-      console.error('[Nova OBPS] Full wall load failed', error);
+      status(`OB PS wall failed: ${error?.message || String(error)}`, true);
+      console.error('[Nova OBPS] v2 load failed', error);
     }
   }
 
-  void loadFullWall();
+  void load();
 })();
