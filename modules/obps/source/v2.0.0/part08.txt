@@ -1,0 +1,31 @@
+    shadow.addEventListener('click',e=>{const chute=e.target.closest?.('[data-chute]');if(chute){state.selected=chute.dataset.chute;saveText(STORE.selected,state.selected);render();return;}const bay=e.target.closest?.('[data-bay]');if(bay){const b=bay.dataset.bay;if(state.expandedBays.has(b))state.expandedBays.delete(b);else state.expandedBays.add(b);saveSet(STORE.bays,state.expandedBays);render();return;}const f=e.target.closest?.('[data-focus]');if(f){state.focus=f.dataset.focus;saveText(STORE.focus,state.focus);render();}});
+    let drag=null;shadow.getElementById('drag').addEventListener('pointerdown',e=>{const r=panel.getBoundingClientRect();drag={x:e.clientX,y:e.clientY,left:r.left,top:r.top};e.currentTarget.setPointerCapture?.(e.pointerId);});shadow.getElementById('drag').addEventListener('pointermove',e=>{if(!drag)return;panel.style.left=`${Math.max(0,drag.left+e.clientX-drag.x)}px`;panel.style.top=`${Math.max(0,drag.top+e.clientY-drag.y)}px`;});shadow.getElementById('drag').addEventListener('pointerup',()=>{if(!drag)return;const r=panel.getBoundingClientRect();saveJson(STORE.pos,{left:r.left,top:r.top});drag=null;});
+    try{new ResizeObserver(()=>{if(!state.minimized){const r=panel.getBoundingClientRect();saveJson(STORE.size,{width:r.width,height:r.height});}}).observe(panel);}catch(_){}
+  }
+
+  function render(){
+    if(!state.visible)return;mount();const s=state.shadow;if(!s)return;const panel=s.querySelector('.panel');panel.classList.toggle('minimized',state.minimized);s.getElementById('min').textContent=state.minimized?'Restore':'Minimize';s.getElementById('status').textContent=state.refreshing?state.status:(state.lastUpdated?`${state.status} · ${fmtStamp(state.lastUpdated)}`:state.status);
+    const st=stats();s.getElementById('truth').textContent=`Truth ${st.coverage}% · ${st.occupied} occupied · ${st.empty} FC empty`;s.getElementById('error').innerHTML=state.lastError?`<div class="errorBar">${esc(state.lastError)}</div>`:'';
+    s.getElementById('cards').innerHTML=[
+      card(st.coverage===100?'good':st.coverage<50?'degraded':'warn','Truth Coverage',`${st.coverage}%`,`${st.known}/${st.total} verified`,'overview'),
+      card(st.act?'danger':'good','ACT NOW',String(st.act),st.act?'Immediate wall risks':'No immediate actions','action'),
+      card(st.watch30?'danger':st.watch60?'warn':'good','90m CPT Watch',String(st.watch90),`60m ${st.watch60} · 30m ${st.watch30}`,'urgent'),
+      card(st.c4?'good':'degraded','Ready To Pack',String(st.c4),`${st.c4} C4 chutes`,'c4'),
+      card(st.c15?'warn':'degraded','C15 Wall',String(st.c15),st.c15?'Bridge exposure':'No C15','c15'),
+      card(st.anomalies?'danger':'good','Inventory Anomalies',String(st.anomalies),st.anomalies?'Owner/read/multi-CS':'Healthy wall','anomalies'),
+      card(st.c5?'warn':'degraded','Cleanup',String(st.c5),`${st.c5} C5 chutes`,'c5')
+    ].join('');
+    const focusDefs=[['overview','Overview'],['action','ACTION QUEUE'],['urgent','90m CPT'],['c4','Open C4'],['c15','Open C15'],['c5','Open Sidelined'],['anomalies','Open Anomalies']];s.getElementById('focus').innerHTML=focusDefs.map(([id,label])=>`<button class="focusBtn ${state.focus===id?'active':''}" data-focus="${id}">${label}</button>`).join('');
+    s.getElementById('wall').innerHTML=wallHtml();s.getElementById('queueTitle').textContent=`${state.focus==='overview'?'Action':state.focus.toUpperCase()} Queue (${queueItems().length})`;s.getElementById('queue').innerHTML=queueHtml();s.getElementById('detail').innerHTML=selectedHtml();s.getElementById('paths').innerHTML=pathsHtml();
+    const loading=s.getElementById('loading');const showLoading=state.firstLoad&&state.refreshing&&!state.minimized;loading.style.display=showLoading?'grid':'none';s.getElementById('loadingText').textContent=state.status;
+  }
+
+  function show(){state.visible=true;mount();if(state.host)state.host.style.display='';if(!state.timer)state.timer=setInterval(()=>refresh(),SETTINGS.refreshMs);render();return true;}
+  function hide(){state.visible=false;if(state.timer){clearInterval(state.timer);state.timer=null;}if(state.host)state.host.style.display='none';return true;}
+  function destroy(){hide();state.host?.remove();state.host=null;state.shadow=null;return true;}
+
+  window[API]={id:MODULE_ID,version:VERSION,loaded:true,directModule:true,show,hide,refresh,destroy,getState:()=>({refreshing:state.refreshing,lastUpdated:state.lastUpdated,coverage:stats().coverage,selected:state.selected,focus:state.focus}),getSnapshot:()=>[...state.chutes.values()].map(x=>({...x}))};
+
+  function boot(){show();refresh();console.log('[Nova OB PS Control Center] direct module loaded',VERSION);}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})();
